@@ -96,10 +96,18 @@ func (e *EVMMonitor) onNewBlock(ctx context.Context, blockNumber uint64) {
 	if blockNumber <= e.latestBlockNumber {
 		return
 	}
+	blockNumbers := []uint64{}
+	if e.latestBlockNumber == 0 {
+		blockNumbers = append(blockNumbers, blockNumber)
+	} else {
+		for i := e.latestBlockNumber + 1; i <= blockNumber; i++ {
+			blockNumbers = append(blockNumbers, i)
+		}
+	}
 	e.latestBlockNumber = blockNumber
-	utils.Infof("on new block %d", e.latestBlockNumber)
+	utils.Infof("on new block %d", blockNumbers)
 	for _, act := range e.actions {
-		err := act.OnNewBlockHandler(ctx, blockNumber)
+		err := act.OnNewBlockHandler(ctx, blockNumbers)
 		if err != nil {
 			utils.Errorf("handle new block fail %s", err)
 			continue
