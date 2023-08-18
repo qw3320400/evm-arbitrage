@@ -3,9 +3,12 @@ package action
 import (
 	"context"
 	"monitor/config"
+	"monitor/utils"
 )
 
 var _ Action = &Arbitrage{}
+
+var arbitrageSingleRoutine = utils.NewSingleRoutine(context.Background())
 
 type Arbitrage struct {
 	config *config.Config
@@ -21,11 +24,18 @@ func (*Arbitrage) Init(context.Context) error {
 	return nil
 }
 
-func (a *Arbitrage) OnNewBlockHandler(ctx context.Context, blockNumbers []uint64) error {
-	// cli, err := client.GetETHClient(ctx, a.config.Node)
-	// if err != nil {
-	// 	return fmt.Errorf("get eth client fail %s", err)
-	// }
-	// cli.Client().Call()
+func (a *Arbitrage) OnNewBlockHandler(ctx context.Context, params ...interface{}) error {
+	blockNumbers := params[0].([]uint64)
+	arbitrageSingleRoutine.Run(ctx, func(ctx context.Context) {
+		err := a.doNewBlockHandler(ctx, blockNumbers)
+		if err != nil {
+			utils.Warnf("arbitrage handle new block fail %+v %s", blockNumbers, err)
+		}
+	})
+	return nil
+}
+
+func (a *Arbitrage) doNewBlockHandler(ctx context.Context, blockNumbers []uint64) error {
+	utils.Infof("arbitrage handle new block %+v", blockNumbers)
 	return nil
 }

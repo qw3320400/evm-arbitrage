@@ -43,6 +43,10 @@ func (e *EVMMonitor) Init(ctx context.Context) error {
 	return nil
 }
 
+func (e *EVMMonitor) ShutDown(ctx context.Context) {
+
+}
+
 func (e *EVMMonitor) loopWatcher(ctx context.Context) {
 	if !e.config.Loop || e.config.LoopTime <= 0 {
 		utils.Errorf("param error %+v", e)
@@ -51,7 +55,7 @@ func (e *EVMMonitor) loopWatcher(ctx context.Context) {
 	for {
 		<-time.After(e.config.LoopTime)
 
-		cli, err := client.GetETHClient(ctx, e.config.Node)
+		cli, err := client.GetETHClient(ctx, e.config.Node, e.config.MulticallAddress)
 		if err != nil {
 			utils.Errorf("get eth client fail %s", err)
 			continue
@@ -68,7 +72,7 @@ func (e *EVMMonitor) loopWatcher(ctx context.Context) {
 }
 
 func (e *EVMMonitor) subscribeWatcher(ctx context.Context) {
-	cli, err := client.GetETHClient(ctx, e.config.Node)
+	cli, err := client.GetETHClient(ctx, e.config.Node, e.config.MulticallAddress)
 	if err != nil {
 		utils.Errorf("get eth client fail %s", err)
 		return
@@ -105,12 +109,14 @@ func (e *EVMMonitor) onNewBlock(ctx context.Context, blockNumber uint64) {
 		}
 	}
 	e.latestBlockNumber = blockNumber
-	utils.Infof("on new block %d", blockNumbers)
+	utils.Infof("on new blocks %d", blockNumbers)
 	for _, act := range e.actions {
-		err := act.OnNewBlockHandler(ctx, blockNumbers)
-		if err != nil {
-			utils.Errorf("handle new block fail %s", err)
-			continue
-		}
+		tmp := act
+		go func() {
+			err := tmp.OnNewBlockHandler(ctx, blockNumbers)
+			if err != nil {
+				utils.Warnf("handle new block fail %d %s", blockNumbers, err)
+			}
+		}()
 	}
 }

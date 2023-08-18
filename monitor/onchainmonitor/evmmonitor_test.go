@@ -59,11 +59,12 @@ func (*TestAction) Init(context.Context) error {
 	return nil
 }
 
-func (a *TestAction) OnNewBlockHandler(ctx context.Context, blockNumbers []uint64) error {
-	cli, err := client.GetETHClient(ctx, a.config.Node)
+func (a *TestAction) OnNewBlockHandler(ctx context.Context, params ...interface{}) error {
+	cli, err := client.GetETHClient(ctx, a.config.Node, a.config.MulticallAddress)
 	if err != nil {
 		return fmt.Errorf("get eth client fail %s", err)
 	}
+	blockNumbers := params[0].([]uint64)
 	for _, blockNumber := range blockNumbers {
 		block, err := cli.BlockByNumber(ctx, big.NewInt(int64(blockNumber)))
 		if err != nil {
