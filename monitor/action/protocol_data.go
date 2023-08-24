@@ -3,11 +3,10 @@ package action
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"monitor/client"
 	"monitor/config"
-	"monitor/utils"
-	"time"
+	"monitor/protocol"
+	"monitor/storage"
 
 	"github.com/ethereum/go-ethereum/core/types"
 )
@@ -39,55 +38,61 @@ func (p *ProtocolData) OnNewBlockHandler(ctx context.Context, params ...interfac
 }
 
 func (p *ProtocolData) doNewBlockHandler(ctx context.Context, blockNumbers []uint64) error {
-	for _, blockNumber := range blockNumbers {
-		p.pool <- struct{}{}
-		go func(num uint64) {
-			utils.Retry(ctx, func(ctx context.Context) error {
-				return p.fetchBlockProtocolData(ctx, num)
-			}, time.Second, -1)
-			<-p.pool
-		}(blockNumber)
+	if len(blockNumbers) == 0 {
+		return nil
 	}
 	return nil
 }
 
-func (p *ProtocolData) fetchBlockProtocolData(ctx context.Context, blockNumber uint64) error {
-	blockData, err := p.getBlockData(ctx, blockNumber)
+func (p *ProtocolData) OnNewLogHandler(ctx context.Context, params ...interface{}) error {
+	logs := params[0].([]*types.Log)
+	return p.doNewLogHandler(ctx, logs)
+}
+
+func (p *ProtocolData) doNewLogHandler(ctx context.Context, logs []*types.Log) error {
+	if len(logs) == 0 {
+		return nil
+	}
+	err := p.doNewLogHandlerUniswapV2(ctx, logs)
 	if err != nil {
-		return fmt.Errorf("get block data fail %s", err)
+		return fmt.Errorf("handle uniswapv2 data fail %s", err)
 	}
 	return nil
 }
 
-type BlockData struct {
-	Receipts []*types.Receipt
-}
-
-func (p *ProtocolData) getBlockData(ctx context.Context, blockNumber uint64) (*BlockData, error) {
-	startTime := time.Now()
-
+func (p *ProtocolData) doNewLogHandlerUniswapV2(ctx context.Context, logs []*types.Log) error {
+	pairs, err := protocol.FilterUniswapV2PairFromLog(ctx, logs)
+	if err != nil {
+		return fmt.Errorf("filter uniswapv2 pair fail %s", err)
+	}
+	pairStore := storage.GetStorage(storage.StoreKeyUniswapv2Pairs)
+	viewcalls := []*client.ViewCall{}
+	for _, pair := range pairs {
+		if data := pairStore.Load(pair.Address); data == nil {
+			viewcalls = append(viewcalls, protocol.NewUniswapV2PairInfoCalls(pair)...)
+		} else {
+			pair.Token0 = data.(*protocol.UniswapV2Pair).Token0
+			pair.Token1 = data.(*protocol.UniswapV2Pair).Token1
+			pair.Error = data.(*protocol.UniswapV2Pair).Error
+		}
+	}
 	cli, err := client.GetETHClient(ctx, p.config.Node, p.config.MulticallAddress)
 	if err != nil {
-		return nil, fmt.Errorf("get eth client fail %s", err)
+		return fmt.Errorf("get eth client fail %s", err)
 	}
-	blockReceipt := []*types.Receipt{}
-	var receiptErr error
-	utils.Retry(ctx, func(ctx context.Context) error {
-		err = cli.Client.Client().CallContext(ctx, &blockReceipt, "eth_getBlockReceipts", big.NewInt(int64(blockNumber)))
-		if err != nil {
-			receiptErr = err
-			return nil
-		}
-		if len(blockReceipt) <= 0 {
-			return fmt.Errorf("can't get block %d receipt, length is 0", blockNumber)
-		}
-		return nil
-	}, time.Millisecond*200, -1)
-	if receiptErr != nil {
-		return nil, fmt.Errorf("get block receipt fail %s", err)
+	callResult, err := cli.MultiViewCall(ctx, nil, viewcalls)
+	if err != nil {
+		return fmt.Errorf("multi view call fail %s", err)
 	}
-	utils.Infof("get %d block and receipt done in %s", blockNumber, time.Since(startTime))
-	return &BlockData{
-		Receipts: blockReceipt,
-	}, nil
+	protocol.UniswapV2PairCallResult(pairs, callResult)
+	var (
+		storeKeys  = []interface{}{}
+		storeDatas = []interface{}{}
+	)
+	for key, pair := range pairs {
+		storeKeys = append(storeKeys, key)
+		storeDatas = append(storeDatas, pair)
+	}
+	pairStore.Store(storeKeys, storeDatas)
+	return nil
 }

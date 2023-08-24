@@ -31,9 +31,15 @@ func GetETHClient(ctx context.Context, node, multicallAddress string) (*ETHClien
 	return ETHClientMap[node], nil
 }
 
-func (e *ETHClient) Multicall2(ctx context.Context, opt *bind.TransactOpts, msgs ...*ethereum.CallMsg) ([]*abi.Multicall2Result, error) {
+type ViewCall struct {
+	ID   string
+	To   common.Address
+	Data []byte
+}
+
+func (e *ETHClient) MultiViewCall(ctx context.Context, opt *bind.TransactOpts, calls []*ViewCall) (map[string]*abi.Multicall2Result, error) {
 	to := common.HexToAddress(e.multicallAddress)
-	input, err := abi.Multicall2ABIInstance.Methods["tryAggregate"].Inputs.Pack(false, NewMulticall2Calls(msgs...))
+	input, err := abi.Multicall2ABIInstance.Methods["tryAggregate"].Inputs.Pack(false, NewViewMulticall2Calls(calls))
 	if err != nil {
 		return nil, fmt.Errorf("pack input fail %s", err)
 	}
@@ -58,9 +64,12 @@ func (e *ETHClient) Multicall2(ctx context.Context, opt *bind.TransactOpts, msgs
 	if !ok {
 		return nil, fmt.Errorf("res type error %+v", res)
 	}
-	ret := make([]*abi.Multicall2Result, len(resStruct))
+	if len(resStruct) != len(calls) {
+		return nil, fmt.Errorf("return results less than calls %d %d", len(resStruct), len(calls))
+	}
+	ret := make(map[string]*abi.Multicall2Result, len(resStruct))
 	for i, one := range resStruct {
-		ret[i] = &abi.Multicall2Result{
+		ret[calls[i].ID] = &abi.Multicall2Result{
 			Success:    one.Success,
 			ReturnData: one.ReturnData,
 		}
@@ -68,14 +77,14 @@ func (e *ETHClient) Multicall2(ctx context.Context, opt *bind.TransactOpts, msgs
 	return ret, nil
 }
 
-func NewMulticall2Calls(msgs ...*ethereum.CallMsg) []abi.Multicall2Call {
-	calls := []abi.Multicall2Call{}
-	for _, msg := range msgs {
-		call := abi.Multicall2Call{
-			Target:   *msg.To,
-			CallData: msg.Data,
+func NewViewMulticall2Calls(calls []*ViewCall) []abi.Multicall2Call {
+	viewcalls := []abi.Multicall2Call{}
+	for _, call := range calls {
+		viewcall := abi.Multicall2Call{
+			Target:   call.To,
+			CallData: call.Data,
 		}
-		calls = append(calls, call)
+		viewcalls = append(viewcalls, viewcall)
 	}
-	return calls
+	return viewcalls
 }

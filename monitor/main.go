@@ -4,6 +4,7 @@ import (
 	"context"
 	"monitor/action"
 	"monitor/config"
+	"monitor/datakeeper"
 	"monitor/onchainmonitor"
 	"monitor/utils"
 	"os"
@@ -17,20 +18,24 @@ func main() {
 
 	ctx := context.Background()
 	conf := &config.Config{
-		Node:             "wss://polygon.llamarpc.com",
-		MulticallAddress: "0x275617327c958bD06b5D6b871E7f491D76113dd8",
+		Node:             "wss://distinguished-long-frog.base-mainnet.discover.quiknode.pro/9733b4ce6e9bbd6556771ea11f7a910d7ba0c50a/",
+		MulticallAddress: "0xcA11bde05977b3631167028862bE2a173976CA11",
 		// Node:             "wss://dimensional-late-hill.discover.quiknode.pro/3a713b1cdb406ca2608e2a1b987eee47aedfcdaf/",
 		// MulticallAddress: "0x9695fa23b27022c7dd752b7d64bb5900677ecc21",
 		StoreFilePath:  "./data",
 		MaxConcurrency: 5,
 	}
-	monitor := onchainmonitor.NewEVMMonitor(ctx, conf, []action.Action{
-		action.NewProtocolData(ctx, conf),
-		action.NewArbitrage(ctx, conf),
-	})
-	err := monitor.Init(ctx)
-	if err != nil {
-		panic(err)
+	keepers := []utils.Keeper{
+		datakeeper.NewFileDataKeeper(ctx, conf.StoreFilePath),
+		onchainmonitor.NewEVMMonitor(ctx, conf, []action.Action{
+			action.NewProtocolData(ctx, conf),
+		}),
+	}
+	for _, keeper := range keepers {
+		err := keeper.Init(ctx)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	for {
@@ -38,7 +43,9 @@ func main() {
 		case <-c:
 			utils.Infof("program shutdown signal")
 			close(c)
-			monitor.ShutDown(ctx)
+			for _, keeper := range keepers {
+				keeper.ShutDown(ctx)
+			}
 			return
 		}
 	}

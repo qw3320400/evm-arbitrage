@@ -1,12 +1,10 @@
-package action
+package arbitrage
 
 import (
 	"context"
 	"monitor/config"
 	"monitor/utils"
 )
-
-var _ Action = &Arbitrage{}
 
 var arbitrageSingleRoutine = utils.NewSingleRoutine(context.Background())
 
