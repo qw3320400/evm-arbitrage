@@ -76,15 +76,17 @@ func (p *ProtocolData) doNewLogHandlerUniswapV2(ctx context.Context, logs []*typ
 			pair.Error = data.(*protocol.UniswapV2Pair).Error
 		}
 	}
-	cli, err := client.GetETHClient(ctx, p.config.Node, p.config.MulticallAddress)
-	if err != nil {
-		return fmt.Errorf("get eth client fail %s", err)
+	if len(viewcalls) > 0 {
+		cli, err := client.GetETHClient(ctx, p.config.Node, p.config.MulticallAddress)
+		if err != nil {
+			return fmt.Errorf("get eth client fail %s", err)
+		}
+		callResult, err := cli.MultiViewCall(ctx, nil, viewcalls)
+		if err != nil {
+			return fmt.Errorf("multi view call fail %s", err)
+		}
+		protocol.UniswapV2PairCallResult(pairs, callResult)
 	}
-	callResult, err := cli.MultiViewCall(ctx, nil, viewcalls)
-	if err != nil {
-		return fmt.Errorf("multi view call fail %s", err)
-	}
-	protocol.UniswapV2PairCallResult(pairs, callResult)
 	var (
 		storeKeys  = []interface{}{}
 		storeDatas = []interface{}{}

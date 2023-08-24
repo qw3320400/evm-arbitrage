@@ -123,6 +123,7 @@ func (e *EVMMonitor) subscribeFilter(ctx context.Context) {
 		return
 	}
 	logs := []*types.Log{}
+	lastTime := time.Now()
 	for {
 		select {
 		case <-sub.Err():
@@ -133,8 +134,12 @@ func (e *EVMMonitor) subscribeFilter(ctx context.Context) {
 			if len(logs) == 0 {
 				continue
 			}
+			if time.Since(lastTime) < 10*time.Millisecond {
+				continue
+			}
 			tmp := logs
 			logs = []*types.Log{}
+			lastTime = time.Now()
 			go e.onNewLogs(ctx, tmp)
 		}
 	}
