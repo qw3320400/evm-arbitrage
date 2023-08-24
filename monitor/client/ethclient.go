@@ -38,6 +38,9 @@ type ViewCall struct {
 }
 
 func (e *ETHClient) MultiViewCall(ctx context.Context, opt *bind.TransactOpts, calls []*ViewCall) (map[string]*abi.Multicall2Result, error) {
+	if len(calls) == 0 {
+		return map[string]*abi.Multicall2Result{}, nil
+	}
 	to := common.HexToAddress(e.multicallAddress)
 	input, err := abi.Multicall2ABIInstance.Methods["tryAggregate"].Inputs.Pack(false, NewViewMulticall2Calls(calls))
 	if err != nil {

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"monitor/action"
+	"monitor/arbitrage"
 	"monitor/config"
 	"monitor/datakeeper"
 	"monitor/onchainmonitor"
@@ -30,6 +31,7 @@ func main() {
 		onchainmonitor.NewEVMMonitor(ctx, conf, []action.Action{
 			action.NewProtocolData(ctx, conf),
 		}),
+		arbitrage.NewArbitrage(ctx, conf),
 	}
 	for _, keeper := range keepers {
 		err := keeper.Init(ctx)

@@ -9,6 +9,7 @@ import (
 	"monitor/config"
 	"monitor/protocol"
 	"monitor/utils"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -44,7 +45,14 @@ func (e *EVMMonitor) Init(ctx context.Context) error {
 	}
 	// go e.loopWatcher(ctx)
 	// go e.subscribeWatcher(ctx)
-	go e.subscribeFilter(ctx)
+	go func() {
+		for {
+			err := e.subscribeFilter(ctx)
+			if err != nil {
+				utils.Warnf("subscribe filter fail %s", err)
+			}
+		}
+	}()
 	return nil
 }
 
@@ -72,22 +80,20 @@ func (e *EVMMonitor) loopWatcher(ctx context.Context) {
 	}
 }
 
-func (e *EVMMonitor) subscribeWatcher(ctx context.Context) {
+func (e *EVMMonitor) subscribeWatcher(ctx context.Context) error {
 	cli, err := client.GetETHClient(ctx, e.config.Node, e.config.MulticallAddress)
 	if err != nil {
-		utils.Errorf("get eth client fail %s", err)
-		return
+		return fmt.Errorf("get eth client fail %s", err)
 	}
 	blocks := make(chan *types.Header)
 	sub, err := cli.SubscribeNewHead(ctx, blocks)
 	if err != nil {
-		utils.Errorf("subscribe new header fail %s", err)
-		return
+		return fmt.Errorf("subscribe new header fail %s", err)
 	}
 	for {
 		select {
-		case <-sub.Err():
-			utils.Errorf("subscribe error %s", err)
+		case err = <-sub.Err():
+			return fmt.Errorf("subscribe error %s", err)
 		case block := <-blocks:
 			bloNum := block.Number.Uint64()
 			if bloNum > e.latestBlockNumber {
@@ -97,17 +103,15 @@ func (e *EVMMonitor) subscribeWatcher(ctx context.Context) {
 	}
 }
 
-func (e *EVMMonitor) subscribeFilter(ctx context.Context) {
+func (e *EVMMonitor) subscribeFilter(ctx context.Context) error {
 	cli, err := client.GetETHClient(ctx, e.config.Node, e.config.MulticallAddress)
 	if err != nil {
-		utils.Errorf("get eth client fail %s", err)
-		return
+		return fmt.Errorf("get eth client fail %s", err)
 	}
 	logChan := make(chan types.Log, 1000)
 	blockNumber, err := cli.BlockNumber(ctx)
 	if err != nil {
-		utils.Errorf("get block number fail %s", err)
-		return
+		return fmt.Errorf("get block number fail %s", err)
 	}
 	filter := ethereum.FilterQuery{
 		FromBlock: big.NewInt(int64(blockNumber)),
@@ -119,27 +123,39 @@ func (e *EVMMonitor) subscribeFilter(ctx context.Context) {
 	}
 	sub, err := cli.SubscribeFilterLogs(ctx, filter, logChan)
 	if err != nil {
-		utils.Errorf("subscribe filter fail %s", err)
-		return
+		return fmt.Errorf("subscribe filter fail %s", err)
 	}
-	logs := []*types.Log{}
-	lastTime := time.Now()
+	var (
+		logs     = []*types.Log{}
+		logsLock = sync.Mutex{}
+		subErr   error
+	)
+	go func() {
+		for log := range logChan {
+			if subErr != nil {
+				return
+			}
+			copy := log
+			logsLock.Lock()
+			logs = append(logs, &copy)
+			logsLock.Unlock()
+		}
+	}()
 	for {
+		<-time.After(time.Millisecond * 10)
 		select {
-		case <-sub.Err():
-			utils.Errorf("subscribe error %s", err)
-		case log := <-logChan:
-			logs = append(logs, &log)
+		case subErr = <-sub.Err():
+			if subErr != nil {
+				return fmt.Errorf("subscribe error %s", subErr)
+			}
 		default:
 			if len(logs) == 0 {
 				continue
 			}
-			if time.Since(lastTime) < 10*time.Millisecond {
-				continue
-			}
+			logsLock.Lock()
 			tmp := logs
 			logs = []*types.Log{}
-			lastTime = time.Now()
+			logsLock.Unlock()
 			go e.onNewLogs(ctx, tmp)
 		}
 	}

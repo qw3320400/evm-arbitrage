@@ -8,6 +8,7 @@ import (
 	"monitor/abi"
 	"monitor/client"
 	"monitor/storage"
+	"monitor/utils"
 	"strconv"
 	"strings"
 
@@ -98,6 +99,7 @@ func (p *UniswapV2Pair) FromFileData(body []byte) error {
 func FilterUniswapV2PairFromLog(ctx context.Context, logs []*types.Log) (map[common.Address]*UniswapV2Pair, error) {
 	datas := map[common.Address]*UniswapV2Pair{}
 	for _, log := range logs {
+		utils.Infof("filter uniswapv2 log in blocknumber %d txindex %d logindex %d", log.BlockNumber, log.TxIndex, log.Index)
 		if len(log.Topics) != 1 ||
 			!strings.EqualFold(log.Topics[0].String(), UniswapV2PairEventSyncSign.String()) {
 			continue

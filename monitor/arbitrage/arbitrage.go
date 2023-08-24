@@ -6,7 +6,9 @@ import (
 	"monitor/utils"
 )
 
-var arbitrageSingleRoutine = utils.NewSingleRoutine(context.Background())
+var (
+	_ utils.Keeper = &Arbitrage{}
+)
 
 type Arbitrage struct {
 	config *config.Config
@@ -22,18 +24,6 @@ func (*Arbitrage) Init(context.Context) error {
 	return nil
 }
 
-func (a *Arbitrage) OnNewBlockHandler(ctx context.Context, params ...interface{}) error {
-	blockNumbers := params[0].([]uint64)
-	arbitrageSingleRoutine.Run(ctx, func(ctx context.Context) {
-		err := a.doNewBlockHandler(ctx, blockNumbers)
-		if err != nil {
-			utils.Warnf("arbitrage handle new block fail %+v %s", blockNumbers, err)
-		}
-	})
-	return nil
-}
+func (*Arbitrage) ShutDown(context.Context) {
 
-func (a *Arbitrage) doNewBlockHandler(ctx context.Context, blockNumbers []uint64) error {
-	utils.Infof("arbitrage handle new block %+v", blockNumbers)
-	return nil
 }

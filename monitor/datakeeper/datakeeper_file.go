@@ -9,6 +9,7 @@ import (
 	"monitor/utils"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -16,6 +17,8 @@ var _ utils.Keeper = &FileDataKeeper{}
 
 type FileDataKeeper struct {
 	storeFilePath string
+	wait          sync.WaitGroup
+	closed        bool
 }
 
 func NewFileDataKeeper(ctx context.Context, storeFilePath string) *FileDataKeeper {
@@ -40,15 +43,20 @@ func (f *FileDataKeeper) Init(ctx context.Context) error {
 }
 
 func (f *FileDataKeeper) ShutDown(ctx context.Context) {
+	f.closed = true
 	err := f.writeData(ctx)
 	if err != nil {
 		utils.Errorf("wirte data fail %s", err)
 	}
+	f.wait.Wait()
 }
 
 func (f *FileDataKeeper) writtingData(ctx context.Context) {
 	for {
 		<-time.After(time.Minute)
+		if f.closed {
+			return
+		}
 		err := f.writeData(ctx)
 		if err != nil {
 			utils.Warnf("wirte data fail %s", err)
@@ -57,6 +65,8 @@ func (f *FileDataKeeper) writtingData(ctx context.Context) {
 }
 
 func (f *FileDataKeeper) writeData(ctx context.Context) error {
+	f.wait.Add(1)
+	defer f.wait.Done()
 	for key, store := range storage.AllDatasStorage {
 		datas := store.LoadAll()
 		dataBody := []byte{}
