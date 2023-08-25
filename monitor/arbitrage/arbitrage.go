@@ -39,7 +39,7 @@ func (*Arbitrage) ShutDown(context.Context) {
 
 func (a *Arbitrage) loopWatcher(ctx context.Context) {
 	for {
-		<-time.After(time.Millisecond * 10)
+		<-time.After(time.Millisecond * 50)
 
 		err := a.findArbitrage(ctx)
 		if err != nil {
@@ -49,12 +49,12 @@ func (a *Arbitrage) loopWatcher(ctx context.Context) {
 }
 
 func (a *Arbitrage) findArbitrage(ctx context.Context) error {
-	startTime := time.Now()
+	// startTime := time.Now()
 	store := storage.GetStorage(storage.StoreKeyUniswapv2Pairs)
 	datas := store.LoadAll()
-	utils.Infof("load data finish in %s", time.Since(startTime))
+	// utils.Infof("load data finish in %s", time.Since(startTime))
 	path := a.bellmanFord(ctx, datas)
-	utils.Infof("bellmanFord finish in %s", time.Since(startTime))
+	// utils.Infof("bellmanFord finish in %s", time.Since(startTime))
 	if len(path) == 0 {
 		return nil
 	}
@@ -62,7 +62,7 @@ func (a *Arbitrage) findArbitrage(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("try path fail %s", err)
 	}
-	utils.Infof("find arbitrage finish in %s", time.Since(startTime))
+	// utils.Infof("find arbitrage finish in %s", time.Since(startTime))
 	return nil
 }
 
@@ -117,6 +117,9 @@ func (a *Arbitrage) bellmanFord(ctx context.Context, datas []interface{}) []comm
 		if idx != ethIdx {
 			hasOtherToken = true
 		}
+		if len(addressPath) > 0 && addresses[idx] == addressPath[len(addressPath)-1] {
+			continue
+		}
 		addressPath = append(addressPath, addresses[idx])
 	}
 	if !hasOtherToken || len(addressPath) == 0 {
@@ -127,6 +130,9 @@ func (a *Arbitrage) bellmanFord(ctx context.Context, datas []interface{}) []comm
 	}
 	if addressPath[len(addressPath)-1] != ethAddr {
 		addressPath = append(addressPath, ethAddr)
+	}
+	if len(addressPath) == 3 {
+		return []common.Address{}
 	}
 	return addressPath
 }
@@ -155,6 +161,10 @@ func (a *Arbitrage) tryPath(ctx context.Context, path []common.Address, datas []
 				priceList[i-1] = price
 				pairList[i-1] = pair
 			}
+		}
+		if pairList[i-1] == nil {
+			utils.Errorf("can not find pair %s %s %+v", tokenIn, tokenOut, path)
+			return nil
 		}
 	}
 	var finalPrice float64
