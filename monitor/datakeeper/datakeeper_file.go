@@ -68,6 +68,7 @@ func (f *FileDataKeeper) writeData(ctx context.Context) error {
 	f.wait.Add(1)
 	defer f.wait.Done()
 	startTime := time.Now()
+	total := 0
 	for key, store := range storage.AllDatasStorage {
 		datas := store.LoadAll()
 		dataBody := []byte{}
@@ -75,12 +76,13 @@ func (f *FileDataKeeper) writeData(ctx context.Context) error {
 			dataBody = append(dataBody, data.(protocol.DataConvert).ToFileData()...)
 			dataBody = append(dataBody, []byte("\n")...)
 		}
+		total += len(datas)
 		err := f.updateFile(ctx, key, dataBody)
 		if err != nil {
 			return fmt.Errorf("update file %s fail %s", key, err)
 		}
 	}
-	utils.Infof("write file date time spend %s", time.Since(startTime))
+	utils.Infof("write file date length %d, spend time %s", total, time.Since(startTime))
 	return nil
 }
 
