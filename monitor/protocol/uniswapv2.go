@@ -33,6 +33,8 @@ type UniswapV2Pair struct {
 	Token1   common.Address
 	Reserve0 *big.Int
 	Reserve1 *big.Int
+	Weight0  float64
+	Weight1  float64
 	Error    bool
 	*StateFromLogUpdate
 }
