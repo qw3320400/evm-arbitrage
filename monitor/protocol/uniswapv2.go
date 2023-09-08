@@ -10,6 +10,7 @@ import (
 	"monitor/storage"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -120,6 +121,7 @@ func FilterUniswapV2PairFromLog(ctx context.Context, logs []*types.Log) (map[com
 				BlockNumber: log.BlockNumber,
 				TxIndex:     log.TxIndex,
 				LogIndex:    log.Index,
+				Timestamp:   time.Now().Unix(),
 			},
 		}
 	}

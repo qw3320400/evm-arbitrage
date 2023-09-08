@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/shopspring/decimal"
 )
 
 type Vertex struct {
@@ -103,44 +104,94 @@ func TestCycle(t *testing.T) {
 		pairs[pair.Address] = pair
 	}
 	t.Log("- load data time", time.Since(startTime))
-	var (
-		vertices  = []int{}
-		edges     = []*BF2Edge{}
-		addresses = []common.Address{}
-		addrToIdx = map[common.Address]int{}
-	)
+	g := NewSwapGraph()
 	for _, pair := range pairs {
-		if pair.Error {
-			continue
-		}
-		var idx0, idx1 int
-		if i, ok := addrToIdx[pair.Token0]; !ok {
-			idx0 := len(vertices)
-			addrToIdx[pair.Token0] = idx0
-			vertices = append(vertices, idx0)
-			addresses = append(addresses, pair.Token0)
-		} else {
-			idx0 = i
-		}
-		if i, ok := addrToIdx[pair.Token1]; !ok {
-			idx1 := len(vertices)
-			addrToIdx[pair.Token1] = idx1
-			vertices = append(vertices, idx1)
-			addresses = append(addresses, pair.Token1)
-		} else {
-			idx1 = i
-		}
-		edges = append(edges,
-			NewEdge(idx0, idx1, pair.Weight0),
-			NewEdge(idx1, idx0, pair.Weight1),
+		g.AddVertices(pair.Token0, pair.Token1)
+		g.AddEdges(
+			&SwapEdge{
+				Key:      pair.Address.Hex() + "+",
+				Pair:     pair.Address,
+				From:     pair.Token0,
+				To:       pair.Token1,
+				Distance: decimal.NewFromFloat(pair.Weight0),
+			},
+			&SwapEdge{
+				Key:      pair.Address.Hex() + "-",
+				Pair:     pair.Address,
+				From:     pair.Token1,
+				To:       pair.Token0,
+				Distance: decimal.NewFromFloat(pair.Weight1),
+			},
 		)
 	}
-	g := NewBF2Graph(edges, vertices)
 	ethAddr := common.HexToAddress("0x4200000000000000000000000000000000000006")
-	ethIdx := addrToIdx[ethAddr]
-	loop := g.FindArbitrageLoop(ethIdx)
-	for _, idx := range loop {
-		t.Log("-----", addresses[idx])
+	g.FindCircle(ethAddr)
+	t.Log("- find loop time", time.Since(startTime))
+}
+
+func Test123(t *testing.T) {
+	vertex := 5
+	edges := [][3]int64{
+		{0, 1, 6},
+		{0, 2, 7},
+		{1, 2, 8},
+		{1, 3, -4},
+		{1, 4, 5},
+		{2, 3, 9},
+		{2, 4, -3},
+		{3, 1, 7},
+		{4, 0, 2},
+		{4, 3, 7},
 	}
-	t.Log("- find loop time", loop, time.Since(startTime))
+	dist := make([]int64, vertex)
+	prev := make([]int64, vertex)
+	dist[0] = 0
+	for i := 1; i < len(dist); i++ {
+		dist[i] = 1000
+	}
+	for {
+		var change bool
+		for _, e := range edges {
+			var (
+				from, to, distance = e[0], e[1], e[2]
+			)
+			if dist[from]+distance < dist[to] {
+				dist[to] = dist[from] + distance
+				prev[to] = from
+				change = true
+			}
+		}
+		if !change {
+			break
+		}
+	}
+	t.Log(prev, dist)
+}
+
+func TestAppend(t *testing.T) {
+	a := []string{"1", "2", "3"}
+	b := append(a, "4")
+	t.Log(a)
+	t.Log(b)
+}
+
+/*
+0.1%		99.6%
+0.3%		99.4%
+0.5%		99.2%
+0.7%		99%
+1%			98.71%
+2%			97.75%
+3%			96.8%
+4%			95.875%
+5%			94.964%
+6%			94.07%
+7%			93.20%
+8%			92.335%
+9%			91.419%
+10%			90.661%
+*/
+func TestAmountOut(t *testing.T) {
+	out := getAmountOut(decimal.NewFromInt(100), decimal.NewFromInt(1000), decimal.NewFromInt(1000000))
+	t.Log(out.String())
 }

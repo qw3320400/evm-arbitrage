@@ -2,6 +2,7 @@ package storage
 
 import (
 	"sync"
+	"time"
 )
 
 const (
@@ -20,6 +21,7 @@ func GetStorage(key string) *DatasStorage {
 
 type DataUpdate interface {
 	NeedUpdate(interface{}) bool
+	Expired(int64) bool
 }
 
 type DatasStorage struct {
@@ -58,9 +60,9 @@ func (s *DatasStorage) Store(keys []interface{}, datas []interface{}) {
 	}
 }
 
-func (s *DatasStorage) LoadAll() []interface{} {
+func (s *DatasStorage) LoadAll() map[interface{}]interface{} {
 	if s == nil {
-		return []interface{}{}
+		return map[interface{}]interface{}{}
 	}
 	if s.datas == nil {
 		s.lock.Lock()
@@ -69,9 +71,13 @@ func (s *DatasStorage) LoadAll() []interface{} {
 	}
 	s.lock.RLock()
 	defer s.lock.RUnlock()
-	all := []interface{}{}
-	for _, one := range s.datas {
-		all = append(all, one)
+	all := map[interface{}]interface{}{}
+	for key, one := range s.datas {
+		if one.(DataUpdate).Expired(time.Now().Unix()) {
+			delete(s.datas, key)
+			continue
+		}
+		all[key] = one
 	}
 	return all
 }

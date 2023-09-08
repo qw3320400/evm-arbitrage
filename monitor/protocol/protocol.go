@@ -20,6 +20,7 @@ type StateFromLogUpdate struct {
 	BlockNumber uint64
 	TxIndex     uint
 	LogIndex    uint
+	Timestamp   int64
 }
 
 func (old *StateFromLogUpdate) NeedUpdate(new interface{}) bool {
@@ -35,14 +36,19 @@ func (old *StateFromLogUpdate) NeedUpdate(new interface{}) bool {
 		(newState.BlockNumber == old.BlockNumber && newState.TxIndex == old.TxIndex && newState.LogIndex > old.LogIndex)
 }
 
+func (old *StateFromLogUpdate) Expired(now int64) bool {
+	return now > old.Timestamp+86400
+}
+
 func (s *StateFromLogUpdate) ToFileData() []byte {
 	if s == nil {
 		return []byte{}
 	}
-	return []byte(fmt.Sprintf("%d,%d,%d",
+	return []byte(fmt.Sprintf("%d,%d,%d,%d",
 		s.BlockNumber,
 		s.TxIndex,
 		s.LogIndex,
+		s.Timestamp,
 	))
 }
 
@@ -51,7 +57,7 @@ func (s *StateFromLogUpdate) FromFileData(body []byte) error {
 		return fmt.Errorf("s is nil")
 	}
 	words := bytes.Split(body, []byte(","))
-	if len(words) != 3 {
+	if len(words) != 4 {
 		return fmt.Errorf("data format error %s", string(body))
 	}
 	var err error
@@ -69,6 +75,11 @@ func (s *StateFromLogUpdate) FromFileData(body []byte) error {
 		return fmt.Errorf("data format error %s", string(body))
 	}
 	s.LogIndex = uint(logIndex)
+	timestamp, err := strconv.ParseInt(string(words[3]), 10, 64)
+	if err != nil {
+		return fmt.Errorf("data format error %s", string(body))
+	}
+	s.Timestamp = timestamp
 	return nil
 }
 

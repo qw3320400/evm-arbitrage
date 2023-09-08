@@ -129,12 +129,7 @@ func (f *FileDataKeeper) appendFile(ctx context.Context, fileName string, body [
 
 func (f *FileDataKeeper) updateFile(ctx context.Context, fileName string, body []byte) error {
 	filePath := filepath.Join(f.storeFilePath, fileName)
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, os.ModePerm)
-	if err != nil {
-		return fmt.Errorf("open file fail %s", err)
-	}
-	defer file.Close()
-	_, err = file.Write(body)
+	err := os.WriteFile(filePath, body, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("write file fail %s", err)
 	}

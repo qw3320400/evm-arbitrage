@@ -15,6 +15,10 @@ func (u *MyData) NeedUpdate(new interface{}) bool {
 	return new.(*MyData).BlockNumber > u.BlockNumber
 }
 
+func (u *MyData) Expired(int64) bool {
+	return false
+}
+
 func TestNeedUpdate(t *testing.T) {
 	m := &DatasStorage{}
 	m.Store(
