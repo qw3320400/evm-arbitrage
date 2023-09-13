@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/shopspring/decimal"
 )
 
 type Vertex struct {
@@ -113,14 +112,14 @@ func TestCycle(t *testing.T) {
 				Pair:     pair.Address,
 				From:     pair.Token0,
 				To:       pair.Token1,
-				Distance: decimal.NewFromFloat(pair.Weight0),
+				Distance: pair.Weight0,
 			},
 			&SwapEdge{
 				Key:      pair.Address.Hex() + "-",
 				Pair:     pair.Address,
 				From:     pair.Token1,
 				To:       pair.Token0,
-				Distance: decimal.NewFromFloat(pair.Weight1),
+				Distance: pair.Weight1,
 			},
 		)
 	}
@@ -192,6 +191,11 @@ func TestAppend(t *testing.T) {
 10%			90.661%
 */
 func TestAmountOut(t *testing.T) {
-	out := getAmountOut(decimal.NewFromInt(100), decimal.NewFromInt(1000), decimal.NewFromInt(1000000))
-	t.Log(out.String())
+	a := &Arbitrage{}
+	out := a.getAmountOut(7024483748378184, 5075022031094541599, 884916887826466518622968)
+	t.Logf("%f", out)
+	out = a.getAmountOut(out, 36813941190031336183629, 355002929)
+	t.Logf("%f", out)
+	out = a.getAmountOut(out, 1238454830614, 785015812149015823715)
+	t.Logf("%f", out)
 }

@@ -7,33 +7,42 @@ import (
 	"monitor/config"
 	"monitor/datakeeper"
 	"monitor/onchainmonitor"
+	"monitor/trader"
 	"monitor/utils"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 func main() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
+	go http.ListenAndServe(":8080", nil)
+
 	ctx := context.Background()
 	conf := &config.Config{
 		Node:             "wss://distinguished-long-frog.base-mainnet.discover.quiknode.pro/9733b4ce6e9bbd6556771ea11f7a910d7ba0c50a/",
 		MulticallAddress: "0xcA11bde05977b3631167028862bE2a173976CA11",
-		WETHAddress:      "0x4200000000000000000000000000000000000006",
+		WETHAddress:      common.HexToAddress("0x4200000000000000000000000000000000000006"),
 		// Node:             "wss://dimensional-late-hill.discover.quiknode.pro/3a713b1cdb406ca2608e2a1b987eee47aedfcdaf/",
 		// MulticallAddress: "0x9695fa23b27022c7dd752b7d64bb5900677ecc21",
-		// WETHAddress:      "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+		// WETHAddress:      common.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"),
 		StoreFilePath:  "./data",
 		MaxConcurrency: 5,
 	}
+	traderKeeper := trader.NewTrader(ctx, conf)
 	keepers := []utils.Keeper{
 		datakeeper.NewFileDataKeeper(ctx, conf.StoreFilePath),
 		onchainmonitor.NewEVMMonitor(ctx, conf, []action.Action{
 			action.NewProtocolData(ctx, conf),
 		}),
-		arbitrage.NewArbitrage(ctx, conf),
+		arbitrage.NewArbitrage(ctx, conf, traderKeeper),
+		traderKeeper,
 	}
 	for _, keeper := range keepers {
 		err := keeper.Init(ctx)
