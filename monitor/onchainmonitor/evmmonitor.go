@@ -119,6 +119,7 @@ func (e *EVMMonitor) subscribeFilter(ctx context.Context) error {
 		Topics: [][]common.Hash{
 			{
 				protocol.UniswapV2PairEventSyncSign,
+				protocol.UniswapV2PairEventSwapSign,
 			},
 		},
 	}

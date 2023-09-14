@@ -192,10 +192,43 @@ func TestAppend(t *testing.T) {
 */
 func TestAmountOut(t *testing.T) {
 	a := &Arbitrage{}
-	out := a.getAmountOut(7024483748378184, 5075022031094541599, 884916887826466518622968)
+	out := a.getAmountOut(7024483748378184, 5075022031094541599, 884916887826466518622968, 30)
 	t.Logf("%f", out)
-	out = a.getAmountOut(out, 36813941190031336183629, 355002929)
+	out = a.getAmountOut(out, 36813941190031336183629, 355002929, 30)
 	t.Logf("%f", out)
-	out = a.getAmountOut(out, 1238454830614, 785015812149015823715)
+	out = a.getAmountOut(out, 1238454830614, 785015812149015823715, 30)
 	t.Logf("%f", out)
+}
+
+func TestFee(t *testing.T) {
+	a0i := big.NewInt(0)
+	a1i := big.NewInt(0)
+	a0o := big.NewInt(0)
+	a1o := big.NewInt(0)
+	r0 := big.NewInt(0)
+	r1 := big.NewInt(0)
+
+	a0i, _ = a0i.SetString("0", 10)
+	a1i, _ = a1i.SetString("2000000000000000", 10)
+	a0o, _ = a0o.SetString("14472300943115752421", 10)
+	a1o, _ = a1o.SetString("0", 10)
+	r0, _ = r0.SetString("14863654188967624342618", 10)
+	r1, _ = r1.SetString("2051974905703706567", 10)
+	t.Log(protocol.CalculatePairFee(a0i, a1i, a0o, a1o, r0, r1))
+
+	a0i, _ = a0i.SetString("2151714554", 10)
+	a1i, _ = a1i.SetString("0", 10)
+	a0o, _ = a0o.SetString("0", 10)
+	a1o, _ = a1o.SetString("2151176174", 10)
+	r0, _ = r0.SetString("124614963475", 10)
+	r1, _ = r1.SetString("129682145128", 10)
+	t.Log(protocol.CalculatePairFee(a0i, a1i, a0o, a1o, r0, r1))
+
+	a0i, _ = a0i.SetString("0", 10)
+	a1i, _ = a1i.SetString("1443650043000000000000000000", 10)
+	a0o, _ = a0o.SetString("165051070728644039", 10)
+	a1o, _ = a1o.SetString("0", 10)
+	r0, _ = r0.SetString("990391729848181355", 10)
+	r1, _ = r1.SetString("10084639825298959164405905709", 10)
+	t.Log(protocol.CalculatePairFee(a0i, a1i, a0o, a1o, r0, r1))
 }

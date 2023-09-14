@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math"
 	"math/big"
 	"monitor/abi"
 	"monitor/client"
 	"monitor/storage"
+	"monitor/utils"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +24,9 @@ var (
 
 	_ storage.DataUpdate = &UniswapV2Pair{}
 	_ DataConvert        = &UniswapV2Pair{}
+
+	// swapEvent = cache.New(time.Minute, time.Hour)
+	// syncEvent = cache.New(time.Minute, time.Hour)
 )
 
 /*
@@ -37,20 +42,41 @@ type UniswapV2Pair struct {
 	Weight0  float64
 	Weight1  float64
 	Error    bool
+	Fee      int64
 	*StateFromLogUpdate
+}
+
+type UniswapV2SwapEvent struct {
+	Address    common.Address
+	Sender     common.Address
+	Amount0In  *big.Int
+	Amount1In  *big.Int
+	Amount0Out *big.Int
+	Amount1Out *big.Int
+	To         common.Address
+}
+
+type UniswapV2SyncEvent struct {
+	Address  common.Address
+	Reserve0 *big.Int
+	Reserve1 *big.Int
 }
 
 func (p *UniswapV2Pair) ToFileData() []byte {
 	if p == nil {
 		return []byte{}
 	}
-	return append([]byte(fmt.Sprintf("%s,%s,%s,%d,%d,%t@",
+	if p.Token0.Big().Cmp(p.Token1.Big()) >= 0 {
+		utils.Errorf("----- token not sort ?? %+v", p)
+	}
+	return append([]byte(fmt.Sprintf("%s,%s,%s,%d,%d,%t,%d@",
 		p.Address,
 		p.Token0,
 		p.Token1,
 		p.Reserve0,
 		p.Reserve1,
 		p.Error,
+		p.Fee,
 	)), p.StateFromLogUpdate.ToFileData()...)
 }
 
@@ -64,7 +90,7 @@ func (p *UniswapV2Pair) FromFileData(body []byte) error {
 	}
 	dataBody := dataAndUpdate[0]
 	words := bytes.Split(dataBody, []byte(","))
-	if len(words) != 6 {
+	if len(words) != 7 {
 		return fmt.Errorf("data format error %s", string(body))
 	}
 	p.Address = common.HexToAddress(string(words[0]))
@@ -94,6 +120,10 @@ func (p *UniswapV2Pair) FromFileData(body []byte) error {
 	if err != nil {
 		return fmt.Errorf("data format error %s", string(body))
 	}
+	p.Fee, err = strconv.ParseInt(string(words[6]), 10, 64)
+	if err != nil {
+		return fmt.Errorf("data format error %s", string(body))
+	}
 	p.StateFromLogUpdate = &StateFromLogUpdate{}
 	return p.StateFromLogUpdate.FromFileData(dataAndUpdate[1])
 }
@@ -117,6 +147,7 @@ func FilterUniswapV2PairFromLog(ctx context.Context, logs []*types.Log) (map[com
 			Address:  log.Address,
 			Reserve0: dataList[0].(*big.Int),
 			Reserve1: dataList[1].(*big.Int),
+			Fee:      30,
 			StateFromLogUpdate: &StateFromLogUpdate{
 				BlockNumber: log.BlockNumber,
 				TxIndex:     log.TxIndex,
@@ -126,6 +157,110 @@ func FilterUniswapV2PairFromLog(ctx context.Context, logs []*types.Log) (map[com
 		}
 	}
 	return datas, nil
+}
+
+func FilterUniswapV2FeeFromLog(ctx context.Context, logs []*types.Log) (map[common.Address]int64, error) {
+	var (
+		fees         = map[common.Address]int64{}
+		swapEventMap = map[string]*UniswapV2SwapEvent{}
+		syncEventMap = map[string]*UniswapV2SyncEvent{}
+	)
+	for _, log := range logs {
+		if len(log.Topics) != 3 ||
+			!strings.EqualFold(log.Topics[0].String(), UniswapV2PairEventSwapSign.String()) {
+			continue
+		}
+		dataList, err := abi.UniswapV2PairABIInstance.Events["Swap"].Inputs.Unpack(log.Data)
+		if err != nil {
+			return nil, fmt.Errorf("unpack event data fail %s", err)
+		}
+		key := fmt.Sprintf("%d:%d:%d", log.BlockNumber, log.TxIndex, log.Index)
+		event := &UniswapV2SwapEvent{
+			Address:    log.Address,
+			Sender:     common.BytesToAddress(log.Topics[1].Bytes()),
+			To:         common.BytesToAddress(log.Topics[2].Bytes()),
+			Amount0In:  dataList[0].(*big.Int),
+			Amount1In:  dataList[1].(*big.Int),
+			Amount0Out: dataList[2].(*big.Int),
+			Amount1Out: dataList[3].(*big.Int),
+		}
+		swapEventMap[key] = event
+
+		if _, ok := fees[event.Address]; ok {
+			continue
+		}
+		syncEvent, ok := syncEventMap[key]
+		if !ok {
+			continue
+		}
+		if syncEvent.Address != event.Address {
+			continue
+		}
+		fees[event.Address] = CalculatePairFee(event.Amount0In, event.Amount1In, event.Amount0Out, event.Amount1Out, syncEvent.Reserve0, syncEvent.Reserve1)
+	}
+	for _, log := range logs {
+		if len(log.Topics) != 1 ||
+			!strings.EqualFold(log.Topics[0].String(), UniswapV2PairEventSyncSign.String()) {
+			continue
+		}
+		dataList, err := abi.UniswapV2PairABIInstance.Events["Sync"].Inputs.Unpack(log.Data)
+		if err != nil {
+			return nil, fmt.Errorf("unpack event data fail %s", err)
+		}
+		if len(dataList) != 2 {
+			return nil, fmt.Errorf("unpack event data error %+v", dataList)
+		}
+		key := fmt.Sprintf("%d:%d:%d", log.BlockNumber, log.TxIndex, log.Index+1)
+		event := &UniswapV2SyncEvent{
+			Address:  log.Address,
+			Reserve0: dataList[0].(*big.Int),
+			Reserve1: dataList[1].(*big.Int),
+		}
+		syncEventMap[key] = event
+
+		if _, ok := fees[event.Address]; ok {
+			continue
+		}
+		swapEvent, ok := swapEventMap[key]
+		if !ok {
+			continue
+		}
+		if swapEvent.Address != event.Address {
+			continue
+		}
+		fees[event.Address] = CalculatePairFee(swapEvent.Amount0In, swapEvent.Amount1In, swapEvent.Amount0Out, swapEvent.Amount1Out, event.Reserve0, event.Reserve1)
+	}
+	return fees, nil
+}
+
+func CalculatePairFee(amount0In, amount1In, amount0Out, amount1Out, reserve0, reserve1 *big.Int) int64 {
+	a0i, _ := amount0In.Float64()
+	a1i, _ := amount1In.Float64()
+	a0o, _ := amount0Out.Float64()
+	a1o, _ := amount1Out.Float64()
+	r0, _ := reserve0.Float64()
+	r1, _ := reserve1.Float64()
+
+	pr0 := r0 + a0o - a0i
+	pr1 := r1 + a1o - a1i
+
+	ret := int64(0)
+	if pr0 < pr1 {
+		ret = int64(math.Ceil(math.Abs((r0*r1/pr1-pr0)/(r0-pr0)) * 10000))
+	} else {
+		ret = int64(math.Ceil(math.Abs((r0*r1/pr0-pr1)/(r1-pr1)) * 10000))
+	}
+	// stable ? 1.000010154287709
+	if ret > 200 {
+		dk := (math.Pow(r0, 3)*r1 + math.Pow(r1, 3)*r0) / (math.Pow(pr0, 3)*pr1 + math.Pow(pr1, 3)*pr0)
+		if dk > 1 && dk < 1.0001 {
+			ret = 5
+		}
+	}
+	if ret > 0 && ret < 10000 {
+		return ret
+	}
+	return 30
 }
 
 func NewUniswapV2PairInfoCalls(pair *UniswapV2Pair) []*client.ViewCall {

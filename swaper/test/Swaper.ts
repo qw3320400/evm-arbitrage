@@ -1,7 +1,8 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { Web3 } from "web3";
 
-var swaperAddress, wethAddress, crfaAddress, axlUSDAddress, pairCRFAWETHAddress, pairCRFAUSDAddress, pairWETHUSDAddress;
+var swaperAddress, wethAddress, crfaAddress, axlUSDAddress, pairCRFAWETHAddress, pairCRFAUSDAddress, pairWETHUSDAddress, multicallAddress;
 
 describe("Swaper", function () {
 
@@ -98,14 +99,64 @@ describe("Swaper", function () {
             await swaper.waitForDeployment();
             swaperAddress = await swaper.getAddress();
 
-            await weth.transfer(accounts[1].address, "1000000000000000000")
+            await weth.transfer(accounts[1].address, "1000000000000000000");
             expect((await weth.balanceOf(accounts[1].address)).toString()).equal("1000000000000000000");
         });
+
+        it("deploy Multicall", async function () {
+            const accounts = await ethers.getSigners();
+            const Multicall3 = await ethers.getContractFactory("Multicall3");
+            const Token = await ethers.getContractFactory("Token");
+            const weth = await Token.attach(wethAddress);
+
+            const multicall = await Multicall3.deploy();
+            await multicall.waitForDeployment();
+            multicallAddress = await multicall.getAddress();
+
+            expect((await weth.balanceOf(accounts[1].address)).toString()).equal("1000000000000000000");
+
+            await multicall.aggregate([]);
+            await expect(multicall.connect(accounts[1]).aggregate([])).to.be.revertedWith("Ownable: caller is not the owner");
+        });
+
     });
 
     describe("Swap", function () {
 
-        it("swap", async function () {
+        // it("swap", async function () {
+        //     const accounts = await ethers.getSigners();
+        //     const Swaper = await ethers.getContractFactory("Swaper");
+        //     const Token = await ethers.getContractFactory("Token");
+        //     const swaper = await Swaper.attach(swaperAddress.toString());
+        //     const weth = await Token.attach(wethAddress);
+
+        //     await weth.connect(accounts[1]).approve(swaperAddress, "100000000000000000000000000");
+
+        //     const routes = [
+        //         {
+        //             pair: pairCRFAWETHAddress,
+        //             direction: true,
+        //             amountOut: "1219469329074767527936",
+        //         },
+        //         {
+        //             pair: pairCRFAUSDAddress,
+        //             direction: false,
+        //             amountOut: "11349331",
+        //         },
+        //         {
+        //             pair: pairWETHUSDAddress,
+        //             direction: false,
+        //             amountOut: "7172248994489342"
+        //         }
+        //     ];
+        //     const tx = await swaper.swap("7024483748378184", routes);
+        //     const receipt = await tx.wait();
+        //     const gasUsed = receipt.gasUsed;
+        //     console.log(`---- gas used ${gasUsed}`)
+        //     console.log(`---- balance ${(await weth.balanceOf(accounts[1].address)).toString()}`)
+        // });
+
+        it("swap2", async function () {
             const accounts = await ethers.getSigners();
             const Swaper = await ethers.getContractFactory("Swaper");
             const Token = await ethers.getContractFactory("Token");
@@ -118,24 +169,163 @@ describe("Swaper", function () {
                 {
                     pair: pairCRFAWETHAddress,
                     direction: true,
-                    amountOut: "1219469329074767527936",
+                    fee: 30,
                 },
                 {
                     pair: pairCRFAUSDAddress,
                     direction: false,
-                    amountOut: "11349331",
+                    fee: 30,
                 },
                 {
                     pair: pairWETHUSDAddress,
                     direction: false,
-                    amountOut: "7172248994489342"
+                    fee: 30,
                 }
             ];
-            const tx = await swaper.swap("7024483748378184", routes);
+            const tx = await swaper.swap2("7024483748378184", routes);
             const receipt = await tx.wait();
             const gasUsed = receipt.gasUsed;
-            console.log(`gas used ${gasUsed}`)
-            console.log(`balance ${(await weth.balanceOf(accounts[1].address)).toString()}`)
+            console.log(`---- gas used ${gasUsed}`)
+            console.log(`---- balance ${(await weth.balanceOf(accounts[1].address)).toString()}`)
+        });
+
+        // it("multicall", async function () {
+        //     const accounts = await ethers.getSigners();
+        //     const Multicall3 = await ethers.getContractFactory("Multicall3");
+        //     const Token = await ethers.getContractFactory("Token");
+        //     const multicall = await Multicall3.attach(multicallAddress.toString());
+        //     const weth = await Token.attach(wethAddress);
+        //     const web3 = new Web3;
+
+        //     await weth.connect(accounts[1]).approve(multicallAddress, "100000000000000000000000000");
+
+        //     const calls = [
+        //         {
+        //             target: wethAddress,
+        //             allowFailure: false,
+        //             callData: web3.eth.abi.encodeFunctionCall(
+        //                 {
+        //                     name: 'transferFrom',
+        //                     type: 'function',
+        //                     inputs: [
+        //                         {
+        //                             type: 'address',
+        //                             name: 'from'
+        //                         },
+        //                         {
+        //                             type: 'address',
+        //                             name: 'to'
+        //                         },
+        //                         {
+        //                             type: 'uint256',
+        //                             name: 'amount'
+        //                         }
+        //                     ]
+        //                 },
+        //                 [accounts[1].address, pairCRFAWETHAddress, "7024483748378184"]
+        //             )
+        //         },
+        //         {
+        //             target: pairCRFAWETHAddress,
+        //             allowFailure: false,
+        //             callData: web3.eth.abi.encodeFunctionCall(
+        //                 {
+        //                     name: 'swap',
+        //                     type: 'function',
+        //                     inputs: [
+        //                         {
+        //                             type: 'uint256',
+        //                             name: 'amount0Out'
+        //                         },
+        //                         {
+        //                             type: 'uint256',
+        //                             name: 'amount1Out'
+        //                         },
+        //                         {
+        //                             type: 'address',
+        //                             name: 'to'
+        //                         },
+        //                         {
+        //                             type: 'bytes',
+        //                             name: 'data'
+        //                         }
+        //                     ]
+        //                 },
+        //                 ["0", "1219469329074767527936", pairCRFAUSDAddress, []]
+        //             )
+        //         },
+        //         {
+        //             target: pairCRFAUSDAddress,
+        //             allowFailure: false,
+        //             callData: web3.eth.abi.encodeFunctionCall(
+        //                 {
+        //                     name: 'swap',
+        //                     type: 'function',
+        //                     inputs: [
+        //                         {
+        //                             type: 'uint256',
+        //                             name: 'amount0Out'
+        //                         },
+        //                         {
+        //                             type: 'uint256',
+        //                             name: 'amount1Out'
+        //                         },
+        //                         {
+        //                             type: 'address',
+        //                             name: 'to'
+        //                         },
+        //                         {
+        //                             type: 'bytes',
+        //                             name: 'data'
+        //                         }
+        //                     ]
+        //                 },
+        //                 ["11349331", "0", pairWETHUSDAddress, []]
+        //             )
+        //         },
+        //         {
+        //             target: pairWETHUSDAddress,
+        //             allowFailure: false,
+        //             callData: web3.eth.abi.encodeFunctionCall(
+        //                 {
+        //                     name: 'swap',
+        //                     type: 'function',
+        //                     inputs: [
+        //                         {
+        //                             type: 'uint256',
+        //                             name: 'amount0Out'
+        //                         },
+        //                         {
+        //                             type: 'uint256',
+        //                             name: 'amount1Out'
+        //                         },
+        //                         {
+        //                             type: 'address',
+        //                             name: 'to'
+        //                         },
+        //                         {
+        //                             type: 'bytes',
+        //                             name: 'data'
+        //                         }
+        //                     ]
+        //                 },
+        //                 ["7172248994489342", "0", accounts[1].address, []]
+        //             )
+        //         }
+        //     ];
+        //     const tx = await multicall.aggregate(calls);
+        //     const receipt = await tx.wait();
+        //     const gasUsed = receipt.gasUsed;
+        //     console.log(`---- gas used ${gasUsed}`)
+        //     console.log(`---- balance ${(await weth.balanceOf(accounts[1].address)).toString()}`)
+        // });
+
+    });
+
+    describe("Other", function () {
+
+        it("account", async function () {
+
         });
 
     });

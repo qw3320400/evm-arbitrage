@@ -71,9 +71,11 @@ func (p *ProtocolData) doNewLogHandlerUniswapV2(ctx context.Context, logs []*typ
 		if data := pairStore.Load(pair.Address); data == nil {
 			viewcalls = append(viewcalls, protocol.NewUniswapV2PairInfoCalls(pair)...)
 		} else {
-			pair.Token0 = data.(*protocol.UniswapV2Pair).Token0
-			pair.Token1 = data.(*protocol.UniswapV2Pair).Token1
-			pair.Error = data.(*protocol.UniswapV2Pair).Error
+			prePair := data.(*protocol.UniswapV2Pair)
+			pair.Token0 = prePair.Token0
+			pair.Token1 = prePair.Token1
+			pair.Fee = prePair.Fee
+			pair.Error = prePair.Error
 		}
 	}
 	if len(viewcalls) > 0 {
@@ -86,6 +88,16 @@ func (p *ProtocolData) doNewLogHandlerUniswapV2(ctx context.Context, logs []*typ
 			return fmt.Errorf("multi view call fail %s", err)
 		}
 		protocol.UniswapV2PairCallResult(pairs, callResult)
+	}
+	fees, err := protocol.FilterUniswapV2FeeFromLog(ctx, logs)
+	if err != nil {
+		return fmt.Errorf("filter uniswapv2 fee fail %s", err)
+	}
+	for addr, fee := range fees {
+		fmt.Println("---- fee ", addr, fee)
+		if pair, ok := pairs[addr]; ok {
+			pair.Fee = fee
+		}
 	}
 	var (
 		storeKeys  = []interface{}{}

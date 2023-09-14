@@ -18,7 +18,7 @@ import (
 
 var (
 	_         utils.Keeper = &Arbitrage{}
-	duplicate              = cache.New(time.Minute, time.Hour)
+	duplicate              = cache.New(time.Second*20, time.Hour)
 )
 
 type Arbitrage struct {
@@ -61,6 +61,9 @@ func (a *Arbitrage) findArbitrage(ctx context.Context) error {
 	g := NewSwapGraph()
 	for _, p := range pairs {
 		pair := p.(*protocol.UniswapV2Pair)
+		if pair.Error || pair.Fee < 0 {
+			continue
+		}
 		r0, _ := big.NewFloat(0).SetInt(pair.Reserve0).Float64()
 		r1, _ := big.NewFloat(0).SetInt(pair.Reserve1).Float64()
 		pair.Weight0 = -math.Log(r1 / r0 * 0.997)
@@ -146,10 +149,10 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 			r0, _ := pair.Reserve0.Float64()
 			r1, _ := pair.Reserve1.Float64()
 			if pair.Token0 == tokenIn {
-				pAmtIn = a.getAmountOut(pAmtIn, r0, r1)
+				pAmtIn = a.getAmountOut(pAmtIn, r0, r1, float64(pair.Fee))
 				tokenIn = pair.Token1
 			} else if pair.Token1 == tokenIn {
-				pAmtIn = a.getAmountOut(pAmtIn, r1, r0)
+				pAmtIn = a.getAmountOut(pAmtIn, r1, r0, float64(pair.Fee))
 				tokenIn = pair.Token0
 			} else {
 				return
@@ -158,8 +161,8 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 		if tokenIn != a.config.WETHAddress {
 			return
 		}
-		if pAmtIn <= amtIn+3*fee {
-			if amtIn < 3*fee {
+		if pAmtIn <= amtIn+2*fee {
+			if amtIn < 2*fee {
 				return
 			}
 			amtIn *= 0.7
@@ -178,18 +181,18 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 	}
 }
 
-func (a *Arbitrage) getAmountOut(amountIn, reserveIn, reserveOut float64) float64 {
+func (a *Arbitrage) getAmountOut(amountIn, reserveIn, reserveOut, fee float64) float64 {
 	if amountIn <= 0 || reserveIn <= 0 || reserveOut <= 0 {
 		return 0
 	}
-	amountInWithFee := amountIn * 9970 * 0.99999
+	amountInWithFee := amountIn * (10000 - fee)
 	numerator := amountInWithFee * reserveOut
 	denominator := reserveIn*10000 + amountInWithFee
 	return numerator / denominator
 }
 
 func (a *Arbitrage) getFee(pathLength int) float64 {
-	gasUse := float64(100000 + 40000*pathLength)
+	gasUse := float64(70000 + 100000*pathLength)
 	gasPrice := a.trader.GasPrice()
 	return gasUse * gasPrice
 }
