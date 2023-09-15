@@ -2,18 +2,22 @@ package trader
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 	"monitor/client"
 	"monitor/config"
 	"monitor/protocol"
 	"monitor/utils"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 var (
@@ -35,9 +39,12 @@ func init() {
 }
 
 type Trader struct {
-	config      *config.Config
+	config *config.Config
+
 	gasPrice    *big.Int
 	ethGasPrice *big.Int
+	signer      types.Signer
+	privateKey  *ecdsa.PrivateKey
 }
 
 func NewTrader(ctx context.Context, conf *config.Config) *Trader {
@@ -49,6 +56,21 @@ func NewTrader(ctx context.Context, conf *config.Config) *Trader {
 }
 
 func (t *Trader) Init(ctx context.Context) error {
+	var err error
+	cli, err := client.GetETHClient(ctx, t.config.Node, t.config.MulticallAddress)
+	if err != nil {
+		return fmt.Errorf("get eth client fail %s", err)
+	}
+	chainID, err := cli.ChainID(ctx)
+	if err != nil {
+		return fmt.Errorf("get chain id fail %s", err)
+	}
+	t.signer = types.LatestSignerForChainID(chainID)
+	t.privateKey, err = crypto.HexToECDSA(strings.TrimPrefix(t.config.PrivateKey, "0x"))
+	if err != nil {
+		return fmt.Errorf("hex to ecdsa fail %s", err)
+	}
+
 	go t.loopWatcher(ctx)
 	return nil
 }
@@ -165,5 +187,15 @@ func (t *Trader) SwapV2(ctx context.Context, inputAmount, outputAmount float64, 
 		return fmt.Errorf("estimate gas fail %s %s", err, common.Bytes2Hex(call.Data))
 	}
 	utils.Warnf("---- estimate gas result %d %s", gasUsed, common.Bytes2Hex(call.Data))
-	return nil
+
+	nonce, err := cli.NonceAt(ctx, call.From, nil)
+	if err != nil {
+		return fmt.Errorf("get nonce fail %s", err)
+	}
+	tx := types.NewTransaction(nonce, *call.To, big.NewInt(0), uint64(float64(gasUsed)*1.1), call.GasPrice, call.Data)
+	tx, err = types.SignTx(tx, t.signer, t.privateKey)
+	if err != nil {
+		return fmt.Errorf("sign tx fail %s", err)
+	}
+	return cli.SendTransaction(ctx, tx)
 }

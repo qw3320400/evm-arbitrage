@@ -17,7 +17,7 @@ import (
 
 var (
 	_         utils.Keeper = &Arbitrage{}
-	duplicate              = cache.New(time.Second*20, time.Hour)
+	duplicate              = cache.New(time.Minute, time.Hour)
 )
 
 type Arbitrage struct {

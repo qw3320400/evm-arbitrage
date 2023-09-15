@@ -44,12 +44,12 @@ func main() {
 	}
 	traderKeeper := trader.NewTrader(ctx, conf)
 	keepers := []utils.Keeper{
+		traderKeeper,
 		datakeeper.NewFileDataKeeper(ctx, conf.StoreFilePath),
 		onchainmonitor.NewEVMMonitor(ctx, conf, []action.Action{
 			action.NewProtocolData(ctx, conf),
 		}),
 		arbitrage.NewArbitrage(ctx, conf, traderKeeper),
-		traderKeeper,
 	}
 	for _, keeper := range keepers {
 		err := keeper.Init(ctx)
