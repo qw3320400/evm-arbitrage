@@ -2,7 +2,6 @@ package arbitrage
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"math/big"
 	"monitor/config"
@@ -27,6 +26,9 @@ type Arbitrage struct {
 }
 
 func NewArbitrage(ctx context.Context, conf *config.Config, trader *trader.Trader) *Arbitrage {
+	if conf.MinRecieve <= 0 {
+		conf.MinRecieve = 0.0001
+	}
 	return &Arbitrage{
 		config: conf,
 		trader: trader,
@@ -66,8 +68,8 @@ func (a *Arbitrage) findArbitrage(ctx context.Context) error {
 		}
 		r0, _ := big.NewFloat(0).SetInt(pair.Reserve0).Float64()
 		r1, _ := big.NewFloat(0).SetInt(pair.Reserve1).Float64()
-		pair.Weight0 = -math.Log(r1 / r0 * 0.997)
-		pair.Weight1 = -math.Log(r0 / r1 * 0.997)
+		pair.Weight0 = -math.Log10(r1 / r0 * (protocol.FeeBase - float64(pair.Fee)) / protocol.FeeBase)
+		pair.Weight1 = -math.Log10(r0 / r1 * (protocol.FeeBase - float64(pair.Fee)) / protocol.FeeBase)
 
 		g.AddVertices(pair.Token0, pair.Token1)
 		g.AddEdges(
@@ -121,7 +123,7 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 	var (
 		amtIn, amtOut float64
 		canTrade      bool
-		fee           = a.getFee(len(path))
+		minRecieve    = a.getMinRecieve()
 	)
 	pair0 := pairs[path[len(path)-1]].(*protocol.UniswapV2Pair)
 	if pair0 == nil {
@@ -161,11 +163,12 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 		if tokenIn != a.config.WETHAddress {
 			return
 		}
-		if pAmtIn <= amtIn+2*fee {
-			if amtIn < 2*fee {
+		if pAmtIn <= amtIn+minRecieve {
+			if amtIn < minRecieve {
+				// utils.Warnf("------ %f %f %f %f %+v", amtIn, pAmtIn, (pAmtIn-amtIn)/math.Pow10(18), minRecieve/math.Pow10(18), path)
 				return
 			}
-			amtIn *= 0.7
+			amtIn *= 0.8
 		} else {
 			canTrade = true
 			amtOut = pAmtIn
@@ -173,10 +176,16 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 		}
 	}
 	if canTrade {
-		utils.Warnf("tryTrade ok %f %f %+v", amtIn, amtOut, path)
-		for i := 0; i < len(path); i++ {
+		pairPath := make([]*protocol.UniswapV2Pair, 0, len(path))
+		utils.Warnf("tryTrade ok %f %f %f %+v", amtIn, amtOut, (amtOut-amtIn)/1000000000000000000, path)
+		for i := len(path) - 1; i >= 0; i-- {
 			pair := pairs[path[i]].(*protocol.UniswapV2Pair)
-			fmt.Println("--------", pair.Reserve0, pair.Reserve1, pair.Weight0, pair.Weight1)
+			pairPath = append(pairPath, pair)
+			utils.Warnf("-------- %s %s %f %f", pair.Reserve0, pair.Reserve1, pair.Weight0, pair.Weight1)
+		}
+		err := a.trader.SwapV2(ctx, amtIn, amtOut, pairPath)
+		if err != nil {
+			utils.Errorf("SwapV2 fail %s", err)
 		}
 	}
 }
@@ -185,14 +194,24 @@ func (a *Arbitrage) getAmountOut(amountIn, reserveIn, reserveOut, fee float64) f
 	if amountIn <= 0 || reserveIn <= 0 || reserveOut <= 0 {
 		return 0
 	}
-	amountInWithFee := amountIn * (10000 - fee)
+	amountInWithFee := amountIn * (protocol.FeeBase - fee)
 	numerator := amountInWithFee * reserveOut
-	denominator := reserveIn*10000 + amountInWithFee
+	denominator := reserveIn*protocol.FeeBase + amountInWithFee
 	return numerator / denominator
 }
 
-func (a *Arbitrage) getFee(pathLength int) float64 {
-	gasUse := float64(70000 + 100000*pathLength)
+func (a *Arbitrage) getMinRecieve() float64 {
 	gasPrice := a.trader.GasPrice()
-	return gasUse * gasPrice
+	eGasPrice := a.trader.ETHGasPrice()
+	// TODO base chain
+	minRecv := a.config.MinRecieve
+	if gasPrice > math.Pow10(9) {
+		minRecv *= 5
+	}
+	if eGasPrice > math.Pow10(9)*20 {
+		minRecv *= 5
+	} else if eGasPrice > math.Pow10(9)*100 {
+		minRecv *= 20
+	}
+	return minRecv * math.Pow10(18)
 }

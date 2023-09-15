@@ -27,13 +27,20 @@ func main() {
 	ctx := context.Background()
 	conf := &config.Config{
 		Node:             "wss://distinguished-long-frog.base-mainnet.discover.quiknode.pro/9733b4ce6e9bbd6556771ea11f7a910d7ba0c50a/",
-		MulticallAddress: "0xcA11bde05977b3631167028862bE2a173976CA11",
+		MulticallAddress: common.HexToAddress("0xcA11bde05977b3631167028862bE2a173976CA11"),
 		WETHAddress:      common.HexToAddress("0x4200000000000000000000000000000000000006"),
 		// Node:             "wss://dimensional-late-hill.discover.quiknode.pro/3a713b1cdb406ca2608e2a1b987eee47aedfcdaf/",
 		// MulticallAddress: "0x9695fa23b27022c7dd752b7d64bb5900677ecc21",
 		// WETHAddress:      common.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"),
-		StoreFilePath:  "./data",
-		MaxConcurrency: 5,
+		StoreFilePath: "./data",
+		FromAddress:   common.HexToAddress(os.Getenv("ADDRESS")),
+		PrivateKey:    os.Getenv("PRIVATEKEY"),
+		SwapAddress:   common.HexToAddress("0xcA11bde05977b3631167028862bE2a173976CA11"),
+		MinRecieve:    0.0001,
+		ETHNode:       "https://eth.llamarpc.com",
+	}
+	if len(conf.FromAddress) == 0 || len(conf.PrivateKey) == 0 {
+		panic("missing env config ADDRESS or PRIVATEKEY")
 	}
 	traderKeeper := trader.NewTrader(ctx, conf)
 	keepers := []utils.Keeper{

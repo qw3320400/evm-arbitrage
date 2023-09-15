@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Web3 } from "web3";
 
-var swaperAddress, wethAddress, crfaAddress, axlUSDAddress, pairCRFAWETHAddress, pairCRFAUSDAddress, pairWETHUSDAddress, multicallAddress;
+var swaperAddress, wethAddress, aAddress, pairEAAddress, pairAEAddress, multicallAddress;
 
 describe("Swaper", function () {
 
@@ -16,16 +16,13 @@ describe("Swaper", function () {
             await weth.waitForDeployment();
             wethAddress = await weth.getAddress();
             expect((await weth.balanceOf(accounts[0].address)).toString()).equal("1000000000000000000000");
+            console.log(`---- weth ${wethAddress}`);
 
-            const crfa = await Token.deploy("CRFA", "1000000000000000000000000");
-            await crfa.waitForDeployment();
-            crfaAddress = await crfa.getAddress();
-            expect((await crfa.balanceOf(accounts[0].address)).toString()).equal("1000000000000000000000000");
+            const a = await Token.deploy("A", "1000000000000000000000000000");
+            await a.waitForDeployment();
+            aAddress = await a.getAddress();
+            expect((await a.balanceOf(accounts[0].address)).toString()).equal("1000000000000000000000000000");
 
-            const axlUSD = await Token.deploy("axlUSD", "1000000000000000000000000");
-            await axlUSD.waitForDeployment();
-            axlUSDAddress = await axlUSD.getAddress();
-            expect((await axlUSD.balanceOf(accounts[0].address)).toString()).equal("1000000000000000000000000");
         });
 
         it("deploy Pairs", async function () {
@@ -34,58 +31,50 @@ describe("Swaper", function () {
             const UniswapV2Factory = await ethers.getContractFactory("UniswapV2Factory");
             const Token = await ethers.getContractFactory("Token");
             const weth = await Token.attach(wethAddress);
-            const crfa = await Token.attach(crfaAddress);
-            const axlUSD = await Token.attach(axlUSDAddress);
+            const a = await Token.attach(aAddress);
 
-            const factory = await UniswapV2Factory.deploy();
-            await factory.waitForDeployment();
-
-            var tx = await factory.createPair(crfaAddress, wethAddress);
+            const factory1 = await UniswapV2Factory.deploy();
+            await factory1.waitForDeployment();
+            var tx = await factory1.createPair(aAddress, wethAddress);
             await tx.wait();
-            pairCRFAWETHAddress = await factory.getPair(crfaAddress, wethAddress);
-            const pairCRFAWETH = await UniswapV2Pair.attach(pairCRFAWETHAddress);
-            await crfa.transfer(pairCRFAWETHAddress, "884916887826466518622968");
-            await weth.transfer(pairCRFAWETHAddress, "5075022031094541599");
-            await pairCRFAWETH.mint(accounts[0].address);
-            var reserve = await pairCRFAWETH.getReserves()
-            if ((await pairCRFAWETH.token0()) == crfaAddress) {
-                expect(reserve[0]).equal("884916887826466518622968");
-                expect(reserve[1]).equal("5075022031094541599");
+            pairEAAddress = await factory1.getPair(aAddress, wethAddress);
+            const pairEA = await UniswapV2Pair.attach(pairEAAddress);
+            await a.transfer(pairEAAddress, "6022296110373909029866881");
+            await weth.transfer(pairEAAddress, "63592353458816909596");
+            await pairEA.mint(accounts[0].address);
+            var reserve = await pairEA.getReserves()
+            if ((await pairEA.token0()) == aAddress) {
+                expect(reserve[0]).equal("6022296110373909029866881");
+                expect(reserve[1]).equal("63592353458816909596");
+                console.log(`---- token0 ${aAddress}`);
+                console.log(`---- token1 ${wethAddress}`);
             } else {
-                expect(reserve[1]).equal("884916887826466518622968");
-                expect(reserve[0]).equal("5075022031094541599");
+                expect(reserve[1]).equal("6022296110373909029866881");
+                expect(reserve[0]).equal("63592353458816909596");
+                console.log(`---- token0 ${wethAddress}`);
+                console.log(`---- token1 ${aAddress}`);
             }
 
-            var tx = await factory.createPair(crfaAddress, axlUSDAddress);
+            const factory2 = await UniswapV2Factory.deploy();
+            await factory2.waitForDeployment();
+            var tx = await factory2.createPair(aAddress, wethAddress);
             await tx.wait();
-            pairCRFAUSDAddress = await factory.getPair(crfaAddress, axlUSDAddress);
-            const pairCRFAUSD = await UniswapV2Pair.attach(pairCRFAUSDAddress);
-            await crfa.transfer(pairCRFAUSDAddress, "36813941190031336183629");
-            await axlUSD.transfer(pairCRFAUSDAddress, "355002929");
-            await pairCRFAUSD.mint(accounts[0].address);
-            var reserve = await pairCRFAUSD.getReserves()
-            if ((await pairCRFAUSD.token0()) == crfaAddress) {
-                expect(reserve[0]).equal("36813941190031336183629");
-                expect(reserve[1]).equal("355002929");
+            pairAEAddress = await factory2.getPair(wethAddress, aAddress);
+            const pairAE = await UniswapV2Pair.attach(pairAEAddress);
+            await weth.transfer(pairAEAddress, "263943380864525275");
+            await a.transfer(pairAEAddress, "20107564299619290146340");
+            await pairAE.mint(accounts[0].address);
+            var reserve = await pairAE.getReserves()
+            if ((await pairAE.token0()) == wethAddress) {
+                expect(reserve[0]).equal("263943380864525275");
+                expect(reserve[1]).equal("20107564299619290146340");
+                console.log(`---- token0 ${wethAddress}`);
+                console.log(`---- token1 ${aAddress}`);
             } else {
-                expect(reserve[1]).equal("36813941190031336183629");
-                expect(reserve[0]).equal("355002929");
-            }
-
-            var tx = await factory.createPair(wethAddress, axlUSDAddress);
-            await tx.wait();
-            pairWETHUSDAddress = await factory.getPair(wethAddress, axlUSDAddress);
-            const pairWETHUSD = await UniswapV2Pair.attach(pairWETHUSDAddress);
-            await weth.transfer(pairWETHUSDAddress, "785015812149015823715");
-            await axlUSD.transfer(pairWETHUSDAddress, "1238454830614");
-            await pairWETHUSD.mint(accounts[0].address);
-            var reserve = await pairWETHUSD.getReserves()
-            if ((await pairWETHUSD.token0()) == wethAddress) {
-                expect(reserve[0]).equal("785015812149015823715");
-                expect(reserve[1]).equal("1238454830614");
-            } else {
-                expect(reserve[1]).equal("785015812149015823715");
-                expect(reserve[0]).equal("1238454830614");
+                expect(reserve[1]).equal("263943380864525275");
+                expect(reserve[0]).equal("20107564299619290146340");
+                console.log(`---- token0 ${aAddress}`);
+                console.log(`---- token1 ${wethAddress}`);
             }
         });
 
@@ -167,22 +156,22 @@ describe("Swaper", function () {
 
             const routes = [
                 {
-                    pair: pairCRFAWETHAddress,
+                    pair: pairEAAddress,
                     direction: true,
-                    fee: 30,
+                    fee: 31,
                 },
                 {
-                    pair: pairCRFAUSDAddress,
+                    pair: pairAEAddress,
                     direction: false,
-                    fee: 30,
+                    fee: 102,
                 },
-                {
-                    pair: pairWETHUSDAddress,
-                    direction: false,
-                    fee: 30,
-                }
+                // {
+                //     pair: pairWETHUSDAddress,
+                //     direction: false,
+                //     fee: 30,
+                // }
             ];
-            const tx = await swaper.swap2("7024483748378184", routes);
+            const tx = await swaper.swap2("46922874771987008", routes);
             const receipt = await tx.wait();
             const gasUsed = receipt.gasUsed;
             console.log(`---- gas used ${gasUsed}`)
@@ -325,7 +314,7 @@ describe("Swaper", function () {
     describe("Other", function () {
 
         it("account", async function () {
-
+    
         });
 
     });

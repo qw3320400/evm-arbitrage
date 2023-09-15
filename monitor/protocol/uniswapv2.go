@@ -18,6 +18,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
+const (
+	FeeBase = float64(10000)
+)
+
 var (
 	UniswapV2PairEventSwapSign = abi.UniswapV2PairABIInstance.Events["Swap"].ID
 	UniswapV2PairEventSyncSign = abi.UniswapV2PairABIInstance.Events["Sync"].ID
@@ -246,9 +250,9 @@ func CalculatePairFee(amount0In, amount1In, amount0Out, amount1Out, reserve0, re
 
 	ret := int64(0)
 	if pr0 < pr1 {
-		ret = int64(math.Ceil(math.Abs((r0*r1/pr1-pr0)/(r0-pr0)) * 10000))
+		ret = int64(math.Ceil(math.Abs((r0*r1/pr1-pr0)/(r0-pr0)) * FeeBase))
 	} else {
-		ret = int64(math.Ceil(math.Abs((r0*r1/pr0-pr1)/(r1-pr1)) * 10000))
+		ret = int64(math.Ceil(math.Abs((r0*r1/pr0-pr1)/(r1-pr1)) * FeeBase))
 	}
 	// stable ? 1.000010154287709
 	if ret > 200 {
@@ -257,7 +261,7 @@ func CalculatePairFee(amount0In, amount1In, amount0Out, amount1Out, reserve0, re
 			ret = 5
 		}
 	}
-	if ret > 0 && ret < 10000 {
+	if ret > 0 && ret < int64(FeeBase) {
 		return ret
 	}
 	return 30

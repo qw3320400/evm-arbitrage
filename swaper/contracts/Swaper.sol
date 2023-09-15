@@ -100,9 +100,11 @@ contract Swaper {
         if (amountIn > balance) {
             amountIn = balance;
         }
-        IERC20(weth).transferFrom(account, routes[0].pair, amountIn);
         uint[] memory amounts = getAmountsOut(amountIn, routes);
         require(amounts[amounts.length - 1] > amountIn, "amount out less than amount in");
+
+        IERC20(weth).transferFrom(account, routes[0].pair, amountIn);
+    
         uint routesLength = routes.length;
         Route calldata route;
         for (uint i = 0; i < routesLength; i++) {

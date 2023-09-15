@@ -4,8 +4,12 @@ import "github.com/ethereum/go-ethereum/common"
 
 type Config struct {
 	Node             string
-	MulticallAddress string
+	MulticallAddress common.Address
 	WETHAddress      common.Address
 	StoreFilePath    string
-	MaxConcurrency   uint64
+	FromAddress      common.Address
+	PrivateKey       string
+	SwapAddress      common.Address
+	MinRecieve       float64
+	ETHNode          string
 }

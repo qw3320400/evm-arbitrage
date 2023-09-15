@@ -7,6 +7,7 @@ import (
 	"monitor/config"
 	"monitor/protocol"
 	"monitor/storage"
+	"monitor/utils"
 
 	"github.com/ethereum/go-ethereum/core/types"
 )
@@ -15,16 +16,11 @@ var _ Action = &ProtocolData{}
 
 type ProtocolData struct {
 	config *config.Config
-	pool   chan struct{}
 }
 
 func NewProtocolData(ctx context.Context, conf *config.Config) *ProtocolData {
-	if conf.MaxConcurrency <= 0 {
-		conf.MaxConcurrency = 1
-	}
 	return &ProtocolData{
 		config: conf,
-		pool:   make(chan struct{}, conf.MaxConcurrency),
 	}
 }
 
@@ -94,7 +90,7 @@ func (p *ProtocolData) doNewLogHandlerUniswapV2(ctx context.Context, logs []*typ
 		return fmt.Errorf("filter uniswapv2 fee fail %s", err)
 	}
 	for addr, fee := range fees {
-		fmt.Println("---- fee ", addr, fee)
+		utils.Infof("caculated pair swap fee %s %d", addr, fee)
 		if pair, ok := pairs[addr]; ok {
 			pair.Fee = fee
 		}

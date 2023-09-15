@@ -14,12 +14,12 @@ import (
 type ETHClient struct {
 	*ethclient.Client
 
-	multicallAddress string
+	multicallAddress common.Address
 }
 
 var ETHClientMap = map[string]*ETHClient{}
 
-func GetETHClient(ctx context.Context, node, multicallAddress string) (*ETHClient, error) {
+func GetETHClient(ctx context.Context, node string, multicallAddress common.Address) (*ETHClient, error) {
 	if ETHClientMap[node] != nil {
 		return ETHClientMap[node], nil
 	}
@@ -41,13 +41,12 @@ func (e *ETHClient) MultiViewCall(ctx context.Context, opt *bind.TransactOpts, c
 	if len(calls) == 0 {
 		return map[string]*abi.Multicall2Result{}, nil
 	}
-	to := common.HexToAddress(e.multicallAddress)
 	input, err := abi.Multicall2ABIInstance.Methods["tryAggregate"].Inputs.Pack(false, NewViewMulticall2Calls(calls))
 	if err != nil {
 		return nil, fmt.Errorf("pack input fail %s", err)
 	}
 	resBody, err := e.Client.CallContract(ctx, ethereum.CallMsg{
-		To:   &to,
+		To:   &e.multicallAddress,
 		Data: append(abi.Multicall2ABIInstance.Methods["tryAggregate"].ID, input...),
 	}, nil)
 	if err != nil {
