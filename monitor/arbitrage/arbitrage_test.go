@@ -3,8 +3,10 @@ package arbitrage
 import (
 	"math"
 	"math/big"
+	"monitor/config"
 	"monitor/protocol"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -231,4 +233,32 @@ func TestFee(t *testing.T) {
 	r0, _ = r0.SetString("990391729848181355", 10)
 	r1, _ = r1.SetString("10084639825298959164405905709", 10)
 	t.Log(protocol.CalculatePairFee(a0i, a1i, a0o, a1o, r0, r1))
+}
+
+func TestAmountsOunt(t *testing.T) {
+	a := &Arbitrage{
+		config: &config.Config{
+			WETHAddress: common.HexToAddress("0x4200000000000000000000000000000000000006"),
+		},
+	}
+	pairs := []string{
+		"--------pair 0xAca85874D52e3e6d991f9E0b273a96228EDfeE7B 0x4200000000000000000000000000000000000006 0xeb466342c4d449bc9f53a865d5cb90586f405215 656018379054220562691 1065374820943 31",
+		"--------pair 0x86cd8533b0166BDcF5d366A3Bb0c3465E56D3ad5 0x4200000000000000000000000000000000000006 0xeb466342c4d449bc9f53a865d5cb90586f405215 2335532225459905275 3590117858 31",
+	}
+	pairPath := []*protocol.UniswapV2Pair{}
+	for _, s := range pairs {
+		w := strings.Split(s, " ")
+		pair := &protocol.UniswapV2Pair{
+			Address:  common.HexToAddress(w[1]),
+			Token0:   common.HexToAddress(w[2]),
+			Token1:   common.HexToAddress(w[3]),
+			Reserve0: big.NewInt(0),
+			Reserve1: big.NewInt(0),
+		}
+		pair.Reserve0, _ = pair.Reserve0.SetString(w[4], 10)
+		pair.Reserve1, _ = pair.Reserve1.SetString(w[5], 10)
+		pair.Fee, _ = strconv.ParseInt(w[6], 10, 64)
+		pairPath = append(pairPath, pair)
+	}
+	t.Log(a.getAmountsOut(float64(101513927242289360), pairPath))
 }

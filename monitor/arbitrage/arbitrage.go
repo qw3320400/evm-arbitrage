@@ -120,6 +120,14 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 	}
 	duplicate.SetDefault(key, struct{}{})
 
+	pairPath := make([]*protocol.UniswapV2Pair, 0, len(path))
+	for i := len(path) - 1; i >= 0; i-- {
+		pair, ok := pairs[path[i]].(*protocol.UniswapV2Pair)
+		if !ok {
+			return
+		}
+		pairPath = append(pairPath, pair)
+	}
 	var (
 		amtIn, amtOut float64
 		canTrade      bool
@@ -139,31 +147,8 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 		return
 	}
 	for {
-		var (
-			pAmtIn  float64 = amtIn
-			tokenIn         = a.config.WETHAddress
-		)
-		for i := len(path) - 1; i >= 0; i-- {
-			pair := pairs[path[i]].(*protocol.UniswapV2Pair)
-			if pair == nil {
-				return
-			}
-			r0, _ := pair.Reserve0.Float64()
-			r1, _ := pair.Reserve1.Float64()
-			if pair.Token0 == tokenIn {
-				pAmtIn = a.getAmountOut(pAmtIn, r0, r1, float64(pair.Fee))
-				tokenIn = pair.Token1
-			} else if pair.Token1 == tokenIn {
-				pAmtIn = a.getAmountOut(pAmtIn, r1, r0, float64(pair.Fee))
-				tokenIn = pair.Token0
-			} else {
-				return
-			}
-		}
-		if tokenIn != a.config.WETHAddress {
-			return
-		}
-		if pAmtIn <= amtIn+minRecieve {
+		pAmtOut := a.getAmountsOut(amtIn, pairPath)
+		if pAmtOut <= amtIn+minRecieve {
 			if amtIn < minRecieve {
 				// utils.Warnf("------ %f %f %f %f %+v", amtIn, pAmtIn, (pAmtIn-amtIn)/math.Pow10(18), minRecieve/math.Pow10(18), path)
 				return
@@ -171,23 +156,45 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 			amtIn *= 0.8
 		} else {
 			canTrade = true
-			amtOut = pAmtIn
+			amtOut = pAmtOut
 			break
 		}
 	}
 	if canTrade {
-		pairPath := make([]*protocol.UniswapV2Pair, 0, len(path))
-		utils.Warnf("tryTrade ok %f %f %f %f %+v", amtIn, amtOut, (amtOut-amtIn)/math.Pow10(18), minRecieve/math.Pow10(18), path)
+		utils.Warnf("tryTrade ok %f %f %f %f %+v", amtIn, amtOut, (amtOut-amtIn)/math.Pow10(18), minRecieve/math.Pow10(18))
 		for i := len(path) - 1; i >= 0; i-- {
 			pair := pairs[path[i]].(*protocol.UniswapV2Pair)
-			pairPath = append(pairPath, pair)
-			utils.Warnf("-------- %s %s %d", pair.Reserve0, pair.Reserve1, pair.Fee)
+			utils.Warnf("--------pair %s %s %s %s %s %d", pair.Address, pair.Token0, pair.Token1, pair.Reserve0, pair.Reserve1, pair.Fee)
 		}
 		err := a.trader.SwapV2(ctx, amtIn, amtOut, pairPath)
 		if err != nil {
 			utils.Errorf("SwapV2 fail %s", err)
 		}
 	}
+}
+
+func (a *Arbitrage) getAmountsOut(amountIn float64, pairPath []*protocol.UniswapV2Pair) float64 {
+	var (
+		pAmtOut  float64 = amountIn
+		tokenOut         = a.config.WETHAddress
+	)
+	for _, pair := range pairPath {
+		r0, _ := pair.Reserve0.Float64()
+		r1, _ := pair.Reserve1.Float64()
+		if pair.Token0 == tokenOut {
+			pAmtOut = a.getAmountOut(pAmtOut, r0, r1, float64(pair.Fee))
+			tokenOut = pair.Token1
+		} else if pair.Token1 == tokenOut {
+			pAmtOut = a.getAmountOut(pAmtOut, r1, r0, float64(pair.Fee))
+			tokenOut = pair.Token0
+		} else {
+			return 0
+		}
+	}
+	if tokenOut != a.config.WETHAddress {
+		return 0
+	}
+	return pAmtOut
 }
 
 func (a *Arbitrage) getAmountOut(amountIn, reserveIn, reserveOut, fee float64) float64 {
