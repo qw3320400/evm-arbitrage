@@ -13,12 +13,19 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 
 	"github.com/ethereum/go-ethereum/common"
 )
 
 func main() {
+	defer func() {
+		if err := recover(); err != nil {
+			utils.Errorf("%s\n%s", err, debug.Stack())
+		}
+	}()
+
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
