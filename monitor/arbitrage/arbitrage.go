@@ -161,7 +161,7 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 		}
 	}
 	if canTrade {
-		utils.Warnf("tryTrade ok %f %f %f %f %+v", amtIn, amtOut, (amtOut-amtIn)/math.Pow10(18), minRecieve/math.Pow10(18))
+		utils.Warnf("tryTrade ok %f %f %f %f", amtIn, amtOut, (amtOut-amtIn)/math.Pow10(18), minRecieve/math.Pow10(18))
 		for i := len(path) - 1; i >= 0; i-- {
 			pair := pairs[path[i]].(*protocol.UniswapV2Pair)
 			utils.Warnf("--------pair %s %s %s %s %s %d", pair.Address, pair.Token0, pair.Token1, pair.Reserve0, pair.Reserve1, pair.Fee)

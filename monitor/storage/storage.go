@@ -71,11 +71,13 @@ func (s *DatasStorage) LoadAll() map[interface{}]interface{} {
 	}
 	s.lock.RLock()
 	defer s.lock.RUnlock()
+	all := map[interface{}]interface{}{}
 	for key, one := range s.datas {
 		if one.(DataUpdate).Expired(time.Now().Unix()) {
 			delete(s.datas, key)
 			continue
 		}
+		all[key] = one
 	}
-	return s.datas
+	return all
 }
