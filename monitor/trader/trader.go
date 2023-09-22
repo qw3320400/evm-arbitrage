@@ -231,7 +231,7 @@ func (t *Trader) SwapV2(ctx context.Context, inputAmount float64, pairPath []*pr
 func (t *Trader) EstimateFee(length int) float64 {
 	// linea chain
 	gasPrice := t.GetPreferGasPrice()
-	gas := float64(80000 + length*70000)
+	gas := swapGas(length)
 	fee := gas * gasPrice
 	return fee
 }
@@ -245,4 +245,34 @@ func (t *Trader) EstimateFeeByGas(length int, gas uint64) float64 {
 
 func (t *Trader) GetPreferGasPrice() float64 {
 	return t.GasPrice() / 10
+}
+
+func swapGas(length int) float64 {
+	switch length {
+	case 2:
+		return float64(210000)
+	case 3:
+		return float64(250000)
+	case 4:
+		return float64(320000)
+	case 5:
+		return float64(360000)
+	default:
+		return float64(80000 + length*60000)
+	}
+}
+
+func swapBaseEthGas(length int) float64 {
+	switch length {
+	case 2:
+		return float64(2100)
+	case 3:
+		return float64(2400)
+	case 4:
+		return float64(2600)
+	case 5:
+		return float64(2800)
+	default:
+		return float64(1800 + length*200)
+	}
 }
