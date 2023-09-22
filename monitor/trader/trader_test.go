@@ -2,6 +2,8 @@ package trader
 
 import (
 	"context"
+	"fmt"
+	"math/big"
 	"monitor/config"
 	"testing"
 
@@ -21,4 +23,30 @@ func TestGasPrice(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log(trader.GasPrice() * 200000 / 1000000000000000000)
+}
+
+func TestBytes(t *testing.T) {
+	bi, _ := big.NewInt(123123).SetString("46922874771987008", 10)
+	str := fmt.Sprintf("%020x", bi)
+	pairs := []*Route{
+		{
+			Pair:      common.HexToAddress("0xe12e18f4aa1e923c0be9db1af30f2547ebc31530"),
+			Direction: true,
+			Fee:       big.NewInt(31),
+		},
+		{
+			Pair:      common.HexToAddress("0x6f58bf1d5d344c01716e8b8b585aee17ad4def86"),
+			Direction: false,
+			Fee:       big.NewInt(102),
+		},
+	}
+	for _, pair := range pairs {
+		var boolToInt int
+		if pair.Direction {
+			boolToInt = 1
+		}
+		str += fmt.Sprintf("%040x%02x%04x", pair.Pair, boolToInt, pair.Fee)
+	}
+	t.Log(str)
+	t.Log(common.Bytes2Hex(common.FromHex(str)))
 }

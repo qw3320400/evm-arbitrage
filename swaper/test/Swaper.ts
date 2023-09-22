@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { Web3 } from "web3";
+import { Web3, eth } from "web3";
 
 var swaperAddress, wethAddress, aAddress, pairEAAddress, pairAEAddress, multicallAddress;
 
@@ -145,7 +145,35 @@ describe("Swaper", function () {
         //     console.log(`---- balance ${(await weth.balanceOf(accounts[1].address)).toString()}`)
         // });
 
-        it("swap2", async function () {
+        // it("swap2", async function () {
+        //     const accounts = await ethers.getSigners();
+        //     const Swaper = await ethers.getContractFactory("Swaper");
+        //     const Token = await ethers.getContractFactory("Token");
+        //     const swaper = await Swaper.attach(swaperAddress.toString());
+        //     const weth = await Token.attach(wethAddress);
+
+        //     await weth.connect(accounts[1]).approve(swaperAddress, "100000000000000000000000000");
+
+        //     const routes = [
+        //         {
+        //             pair: pairEAAddress,
+        //             direction: true,
+        //             fee: 31,
+        //         },
+        //         {
+        //             pair: pairAEAddress,
+        //             direction: false,
+        //             fee: 102,
+        //         },
+        //     ];
+        //     const tx = await swaper.swap2("46922874771987008", routes);
+        //     const receipt = await tx.wait();
+        //     const gasUsed = receipt.gasUsed;
+        //     console.log(`---- gas used ${gasUsed}`) // 239673
+        //     console.log(`---- balance ${(await weth.balanceOf(accounts[1].address)).toString()}`)
+        // });
+
+        it("swap", async function () {
             const accounts = await ethers.getSigners();
             const Swaper = await ethers.getContractFactory("Swaper");
             const Token = await ethers.getContractFactory("Token");
@@ -154,28 +182,26 @@ describe("Swaper", function () {
 
             await weth.connect(accounts[1]).approve(swaperAddress, "100000000000000000000000000");
 
-            const routes = [
-                {
-                    pair: pairEAAddress,
-                    direction: true,
-                    fee: 31,
-                },
-                {
-                    pair: pairAEAddress,
-                    direction: false,
-                    fee: 102,
-                },
-                // {
-                //     pair: pairWETHUSDAddress,
-                //     direction: false,
-                //     fee: 30,
-                // }
-            ];
-            const tx = await swaper.swap2("46922874771987008", routes);
+            var param = ethers.concat([
+                ethers.zeroPadValue(ethers.toBeHex("46922874771987008"), 10),
+                ethers.zeroPadValue(ethers.toBeHex(pairEAAddress), 20),
+                ethers.toBeHex(1),
+                ethers.zeroPadValue(ethers.toBeHex(31), 2),
+                ethers.zeroPadValue(ethers.toBeHex(pairAEAddress), 20),
+                ethers.toBeHex(0),
+                ethers.zeroPadValue(ethers.toBeHex(102), 2),
+            ])
+            console.log(param);
+            
+            const tx = await swaper.swap(param);
             const receipt = await tx.wait();
             const gasUsed = receipt.gasUsed;
             console.log(`---- gas used ${gasUsed}`)
             console.log(`---- balance ${(await weth.balanceOf(accounts[1].address)).toString()}`)
+        });
+
+        it("getAmountOut", async function () {
+
         });
 
         // it("multicall", async function () {

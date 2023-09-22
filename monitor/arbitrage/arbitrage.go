@@ -208,17 +208,10 @@ func (a *Arbitrage) getAmountOut(amountIn, reserveIn, reserveOut, fee float64) f
 }
 
 func (a *Arbitrage) getMinRecieve() float64 {
-	gasPrice := a.trader.GasPrice()
+	gasPrice := a.trader.GasPrice() / 20
 	eGasPrice := a.trader.ETHGasPrice()
 	// TODO base chain
-	minRecv := a.config.MinRecieve
-	if gasPrice > math.Pow10(9) {
-		minRecv *= 5
-	}
-	if eGasPrice > math.Pow10(9)*20 {
-		minRecv *= 5
-	} else if eGasPrice > math.Pow10(9)*100 {
-		minRecv *= 20
-	}
-	return minRecv * math.Pow10(18)
+	// minRecv := a.config.MinRecieve
+	minRecv := 350000*gasPrice + (eGasPrice * 2000 * 0.684)
+	return minRecv
 }

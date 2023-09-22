@@ -23,8 +23,26 @@ import (
 var (
 	_ utils.Keeper = &Trader{}
 
-	swapMetaData = `[{"type":"function","name":"swap2","stateMutability":"nonpayable","inputs":[{"internalType":"uint256","type":"uint256","name":"amountIn"},{"internalType":"struct Swaper.Route[]","type":"tuple[]","name":"routes","components":[{"internalType":"address","type":"address","name":"pair"},{"internalType":"bool","type":"bool","name":"direction"},{"internalType":"uint256","type":"uint256","name":"fee"}]}],"outputs":[]}]`
-	swapABI      *abi.ABI
+	swapMetaData = `
+[
+    {
+        "type":"function",
+        "name":"swap",
+        "stateMutability":"nonpayable",
+        "inputs":[
+            {
+                "internalType":"bytes",
+                "type":"bytes",
+                "name":"params"
+            }
+        ],
+        "outputs":[
+
+        ]
+    }
+]
+	`
+	swapABI *abi.ABI
 )
 
 func init() {
@@ -144,7 +162,7 @@ type Route struct {
 }
 
 func (t *Trader) SwapV2(ctx context.Context, inputAmount, outputAmount float64, pairPath []*protocol.UniswapV2Pair) error {
-	gasPrice := int64(t.GasPrice())
+	gasPrice := int64(t.GasPrice() / 20)
 	if gasPrice <= 0 {
 		return fmt.Errorf("gas price error %d", gasPrice)
 	}
@@ -155,28 +173,21 @@ func (t *Trader) SwapV2(ctx context.Context, inputAmount, outputAmount float64, 
 		GasPrice: big.NewInt(gasPrice),
 	}
 	var (
-		routes = make([]Route, 0, len(pairPath))
-		inAddr = t.config.WETHAddress
+		inAddr          = t.config.WETHAddress
+		paramStr string = fmt.Sprintf("%020x", big.NewInt(int64(inputAmount)))
 	)
 	for _, pair := range pairPath {
-		route := Route{
-			Pair: pair.Address,
-			Fee:  big.NewInt(pair.Fee),
-		}
+		var boolToInt int
 		if pair.Token0 == inAddr {
-			route.Direction = true
-			inAddr = pair.Token1
-		} else {
-			route.Direction = false
-			inAddr = pair.Token0
+			boolToInt = 1
 		}
-		routes = append(routes, route)
+		paramStr += fmt.Sprintf("%040x%02x%04x", pair.Address, boolToInt, big.NewInt(pair.Fee))
 	}
-	param, err := swapABI.Methods["swap2"].Inputs.Pack(big.NewInt(int64(inputAmount)), routes)
+	param, err := swapABI.Methods["swap"].Inputs.Pack(common.FromHex(paramStr))
 	if err != nil {
-		return fmt.Errorf("pack input param fail %s", err)
+		return fmt.Errorf("abi pack fail %s", err)
 	}
-	call.Data = append(swapABI.Methods["swap2"].ID, param...)
+	call.Data = append(swapABI.Methods["swap"].ID, param...)
 
 	cli, err := client.GetETHClient(ctx, t.config.Node, t.config.MulticallAddress)
 	if err != nil {
@@ -186,7 +197,8 @@ func (t *Trader) SwapV2(ctx context.Context, inputAmount, outputAmount float64, 
 	if err != nil {
 		return fmt.Errorf("estimate gas fail %s %s", err, common.Bytes2Hex(call.Data))
 	}
-	utils.Warnf("---- estimate gas result %d %s", gasUsed, common.Bytes2Hex(call.Data))
+	utils.Warnf("---- estimate gas result gasUsed %d gasPrice %f gwei eth gasPrice %f gwei", gasUsed, float64(gasPrice)/1000000000, t.ETHGasPrice()/1000000000)
+	return nil
 
 	nonce, err := cli.NonceAt(ctx, call.From, nil)
 	if err != nil {

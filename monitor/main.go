@@ -42,7 +42,7 @@ func main() {
 		StoreFilePath: "./data",
 		FromAddress:   common.HexToAddress(os.Getenv("ADDRESS")),
 		PrivateKey:    os.Getenv("PRIVATEKEY"),
-		SwapAddress:   common.HexToAddress("0xcA11bde05977b3631167028862bE2a173976CA11"),
+		SwapAddress:   common.HexToAddress("0x229735D12D750B09b751fbD6b75B55902c1A2c0a"),
 		MinRecieve:    0.0001,
 		ETHNode:       "https://eth.llamarpc.com",
 	}
