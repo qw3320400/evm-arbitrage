@@ -244,7 +244,7 @@ func (t *Trader) EstimateFeeByGas(length int, gas uint64) float64 {
 }
 
 func (t *Trader) GetPreferGasPrice() float64 {
-	return t.GasPrice() / 10
+	return t.GasPrice() * 0.8
 }
 
 func swapGas(length int) float64 {
