@@ -17,7 +17,7 @@ import (
 
 var (
 	_         utils.Keeper = &Arbitrage{}
-	duplicate              = cache.New(time.Minute, time.Hour)
+	duplicate              = cache.New(time.Minute, 12*time.Hour)
 )
 
 type Arbitrage struct {
@@ -115,10 +115,11 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 		return
 	}
 	key := AddressList(path).String()
-	if _, ok := duplicate.Get(key); ok {
+	dupCount, ok := duplicate.Get(key)
+	if ok {
 		return
 	}
-	duplicate.SetDefault(key, struct{}{})
+	duplicate.SetDefault(key, int(0))
 
 	pairPath := make([]*protocol.UniswapV2Pair, 0, len(path))
 	for i := len(path) - 1; i >= 0; i-- {
@@ -168,6 +169,12 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 		}
 		err := a.trader.SwapV2(ctx, amtIn, pairPath)
 		if err != nil {
+			failCount := 0
+			if dupCount != nil {
+				failCount = dupCount.(int)
+			}
+			failCount++
+			duplicate.Set(key, failCount, time.Minute*time.Duration(10*failCount))
 			utils.Errorf("SwapV2 fail %s", err)
 		}
 	}
