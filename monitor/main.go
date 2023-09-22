@@ -33,13 +33,13 @@ func main() {
 
 	ctx := context.Background()
 	conf := &config.Config{
-		Node:             "wss://distinguished-long-frog.base-mainnet.discover.quiknode.pro/9733b4ce6e9bbd6556771ea11f7a910d7ba0c50a/",
+		Node:             "wss://linea-mainnet.infura.io/ws/v3/b13093bf13104631811fcef50795a4a9",
 		MulticallAddress: common.HexToAddress("0xcA11bde05977b3631167028862bE2a173976CA11"),
-		WETHAddress:      common.HexToAddress("0x4200000000000000000000000000000000000006"),
+		WETHAddress:      common.HexToAddress("0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f"),
 		// Node:             "wss://dimensional-late-hill.discover.quiknode.pro/3a713b1cdb406ca2608e2a1b987eee47aedfcdaf/",
 		// MulticallAddress: "0x9695fa23b27022c7dd752b7d64bb5900677ecc21",
 		// WETHAddress:      common.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"),
-		StoreFilePath: "./data",
+		StoreFilePath: "./data_linea",
 		FromAddress:   common.HexToAddress(os.Getenv("ADDRESS")),
 		PrivateKey:    os.Getenv("PRIVATEKEY"),
 		SwapAddress:   common.HexToAddress("0x229735D12D750B09b751fbD6b75B55902c1A2c0a"),

@@ -106,10 +106,10 @@ func (t *Trader) loopWatcher(ctx context.Context) {
 			utils.Warnf("fetch gas price fail %s", err)
 		}
 
-		err = t.fetchETHGasPrice(ctx)
-		if err != nil {
-			utils.Warnf("fetch eth gas price fail %s", err)
-		}
+		// err = t.fetchETHGasPrice(ctx)
+		// if err != nil {
+		// 	utils.Warnf("fetch eth gas price fail %s", err)
+		// }
 
 		if now := time.Now(); now.Sub(logFeeTime) > time.Second*5 {
 			utils.Infof("current suggest gas price is %f gwei, eth gas price is %f gwei", t.GasPrice()/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
@@ -229,24 +229,20 @@ func (t *Trader) SwapV2(ctx context.Context, inputAmount float64, pairPath []*pr
 }
 
 func (t *Trader) EstimateFee(length int) float64 {
-	// TODO base chain
+	// linea chain
 	gasPrice := t.GetPreferGasPrice()
-	eGasPrice := t.ETHGasPrice()
 	gas := float64(80000 + length*70000)
-	eGas := float64(2000 + length*200)
-	fee := gas*gasPrice + (eGasPrice * eGas)
+	fee := gas * gasPrice
 	return fee
 }
 
 func (t *Trader) EstimateFeeByGas(length int, gas uint64) float64 {
-	// TODO base chain
+	// linea chain
 	gasPrice := t.GetPreferGasPrice()
-	eGasPrice := t.ETHGasPrice()
-	eGas := float64(2000 + length*200)
-	fee := float64(gas)*gasPrice + (eGasPrice * eGas)
+	fee := float64(gas) * gasPrice
 	return fee
 }
 
 func (t *Trader) GetPreferGasPrice() float64 {
-	return t.GasPrice() / 20
+	return t.GasPrice() / 10
 }
