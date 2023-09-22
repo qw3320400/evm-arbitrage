@@ -262,9 +262,24 @@ func CalculatePairFee(amount0In, amount1In, amount0Out, amount1Out, reserve0, re
 		}
 	}
 	if ret > 0 && ret < int64(FeeBase) {
-		return ret
+		return fixFee(ret)
 	}
 	return 30
+}
+
+func fixFee(fee int64) int64 {
+	switch fee {
+	case 14:
+		return 15
+	case 19:
+		return 20
+	case 24:
+		return 25
+	case 29:
+		return 30
+	default:
+		return fee
+	}
 }
 
 func NewUniswapV2PairInfoCalls(pair *UniswapV2Pair) []*client.ViewCall {
