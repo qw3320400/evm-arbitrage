@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"math"
 	"math/big"
 	"monitor/client"
 	"monitor/config"
@@ -98,6 +99,7 @@ func (*Trader) ShutDown(context.Context) {
 }
 
 func (t *Trader) loopWatcher(ctx context.Context) {
+	var logFeeTime = time.Now()
 	for {
 		err := t.fetchGasPrice(ctx)
 		if err != nil {
@@ -109,7 +111,11 @@ func (t *Trader) loopWatcher(ctx context.Context) {
 			utils.Warnf("fetch eth gas price fail %s", err)
 		}
 
-		<-time.After(time.Second * 5)
+		if now := time.Now(); now.Sub(logFeeTime) > time.Second*5 {
+			utils.Infof("current suggest gas price is %f gwei, eth gas price is %f gwei", t.GasPrice()/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
+			logFeeTime = now
+		}
+		<-time.After(time.Second * 2)
 	}
 }
 
@@ -125,7 +131,6 @@ func (t *Trader) fetchGasPrice(ctx context.Context) error {
 	if gasPrice.Cmp(big.NewInt(0)) > 0 {
 		t.gasPrice = gasPrice
 	}
-	utils.Infof("current suggest gas price is %f gwei", t.GasPrice()/1000000000)
 	return nil
 }
 
@@ -141,7 +146,6 @@ func (t *Trader) fetchETHGasPrice(ctx context.Context) error {
 	if eGasPrice.Cmp(big.NewInt(0)) > 0 {
 		t.ethGasPrice = eGasPrice
 	}
-	utils.Infof("current eth suggest gas price is %f gwei", t.ETHGasPrice()/1000000000)
 	return nil
 }
 
@@ -161,8 +165,8 @@ type Route struct {
 	Fee       *big.Int
 }
 
-func (t *Trader) SwapV2(ctx context.Context, inputAmount, outputAmount float64, pairPath []*protocol.UniswapV2Pair) error {
-	gasPrice := int64(t.GasPrice() / 20)
+func (t *Trader) SwapV2(ctx context.Context, inputAmount float64, pairPath []*protocol.UniswapV2Pair) error {
+	gasPrice := int64(t.GetPreferGasPrice())
 	if gasPrice <= 0 {
 		return fmt.Errorf("gas price error %d", gasPrice)
 	}
@@ -180,6 +184,9 @@ func (t *Trader) SwapV2(ctx context.Context, inputAmount, outputAmount float64, 
 		var boolToInt int
 		if pair.Token0 == inAddr {
 			boolToInt = 1
+			inAddr = pair.Token1
+		} else {
+			inAddr = pair.Token0
 		}
 		paramStr += fmt.Sprintf("%040x%02x%04x", pair.Address, boolToInt, big.NewInt(pair.Fee))
 	}
@@ -197,8 +204,6 @@ func (t *Trader) SwapV2(ctx context.Context, inputAmount, outputAmount float64, 
 	if err != nil {
 		return fmt.Errorf("estimate gas fail %s %s", err, common.Bytes2Hex(call.Data))
 	}
-	utils.Warnf("---- estimate gas result gasUsed %d gasPrice %f gwei eth gasPrice %f gwei", gasUsed, float64(gasPrice)/1000000000, t.ETHGasPrice()/1000000000)
-	return nil
 
 	nonce, err := cli.NonceAt(ctx, call.From, nil)
 	if err != nil {
@@ -209,5 +214,39 @@ func (t *Trader) SwapV2(ctx context.Context, inputAmount, outputAmount float64, 
 	if err != nil {
 		return fmt.Errorf("sign tx fail %s", err)
 	}
+	// final check
+	amountOut := protocol.GetAmountsOut(t.config.WETHAddress, inputAmount, pairPath)
+	estimateFee := t.EstimateFeeByGas(len(pairPath), gasUsed)
+	// if amountOut-inputAmount < estimateFee*2 {
+	// 	return fmt.Errorf("final check fail amountIn %f amountOut %f estimateFee %f gasUsed %d gasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), estimateFee/math.Pow10(18), gasUsed, float64(gasPrice)/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
+	// }
+	if amountOut-inputAmount < estimateFee*1.2 {
+		return fmt.Errorf("final check fail amountIn %f amountOut %f estimateFee %f gasUsed %d gasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), estimateFee/math.Pow10(18), gasUsed, float64(gasPrice)/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
+	}
+	utils.Warnf("final check pass amountIn %f amountOut %f estimateFee %f gasUsed %d gasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), estimateFee/math.Pow10(18), gasUsed, float64(gasPrice)/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
+	// return nil
 	return cli.SendTransaction(ctx, tx)
+}
+
+func (t *Trader) EstimateFee(length int) float64 {
+	// TODO base chain
+	gasPrice := t.GetPreferGasPrice()
+	eGasPrice := t.ETHGasPrice()
+	gas := float64(80000 + length*70000)
+	eGas := float64(2000 + length*200)
+	fee := gas*gasPrice + (eGasPrice * eGas * 0.684)
+	return fee
+}
+
+func (t *Trader) EstimateFeeByGas(length int, gas uint64) float64 {
+	// TODO base chain
+	gasPrice := t.GetPreferGasPrice()
+	eGasPrice := t.ETHGasPrice()
+	eGas := float64(2000 + length*200)
+	fee := float64(gas)*gasPrice + (eGasPrice * eGas)
+	return fee
+}
+
+func (t *Trader) GetPreferGasPrice() float64 {
+	return t.GasPrice() / 20
 }

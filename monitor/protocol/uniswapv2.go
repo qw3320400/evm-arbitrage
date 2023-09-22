@@ -325,3 +325,37 @@ func UniswapV2PairCallResult(pairs map[common.Address]*UniswapV2Pair, results ma
 		}
 	}
 }
+
+func GetAmountsOut(tokenIn common.Address, amountIn float64, pairPath []*UniswapV2Pair) float64 {
+	var (
+		pAmtOut  float64 = amountIn
+		tokenOut         = tokenIn
+	)
+	for _, pair := range pairPath {
+		r0, _ := pair.Reserve0.Float64()
+		r1, _ := pair.Reserve1.Float64()
+		if pair.Token0 == tokenOut {
+			pAmtOut = GetAmountOut(pAmtOut, r0, r1, float64(pair.Fee))
+			tokenOut = pair.Token1
+		} else if pair.Token1 == tokenOut {
+			pAmtOut = GetAmountOut(pAmtOut, r1, r0, float64(pair.Fee))
+			tokenOut = pair.Token0
+		} else {
+			return 0
+		}
+	}
+	if tokenOut != tokenIn {
+		return 0
+	}
+	return pAmtOut
+}
+
+func GetAmountOut(amountIn, reserveIn, reserveOut, fee float64) float64 {
+	if amountIn <= 0 || reserveIn <= 0 || reserveOut <= 0 {
+		return 0
+	}
+	amountInWithFee := amountIn * (FeeBase - fee)
+	numerator := amountInWithFee * reserveOut
+	denominator := reserveIn*FeeBase + amountInWithFee
+	return numerator / denominator
+}

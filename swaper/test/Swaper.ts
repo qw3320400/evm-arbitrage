@@ -201,7 +201,13 @@ describe("Swaper", function () {
         });
 
         it("getAmountOut", async function () {
+            // const Swaper = await ethers.getContractFactory("Swaper");
+            // const swaper = await Swaper.attach(swaperAddress.toString());
 
+            // var param = ethers.hexlify("0x000000003ba4c0603f8c55000adfc0babd65f1c43a1eb290156931d4b67301001eddceda9866c0bced84561673ddef77d218b6d90e0000193cd5a4c56c4794d88170b6bde719656a7302653900001cc52328d5af54a12da68459ffc6d0845e91a8395f00001aa76ebd17353035d84560eec5eff22de533f0052c01006d");
+            // param = ethers.concat([param]);
+            // console.log(param);
+            // await swaper.testGetAmountOut(param);
         });
 
         // it("multicall", async function () {

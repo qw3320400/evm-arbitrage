@@ -3,7 +3,6 @@ package arbitrage
 import (
 	"math"
 	"math/big"
-	"monitor/config"
 	"monitor/protocol"
 	"os"
 	"strconv"
@@ -193,12 +192,11 @@ func TestAppend(t *testing.T) {
 10%			90.661%
 */
 func TestAmountOut(t *testing.T) {
-	a := &Arbitrage{}
-	out := a.getAmountOut(7024483748378184, 5075022031094541599, 884916887826466518622968, 30)
+	out := protocol.GetAmountOut(7024483748378184, 5075022031094541599, 884916887826466518622968, 30)
 	t.Logf("%f", out)
-	out = a.getAmountOut(out, 36813941190031336183629, 355002929, 30)
+	out = protocol.GetAmountOut(out, 36813941190031336183629, 355002929, 30)
 	t.Logf("%f", out)
-	out = a.getAmountOut(out, 1238454830614, 785015812149015823715, 30)
+	out = protocol.GetAmountOut(out, 1238454830614, 785015812149015823715, 30)
 	t.Logf("%f", out)
 }
 
@@ -236,11 +234,7 @@ func TestFee(t *testing.T) {
 }
 
 func TestAmountsOunt(t *testing.T) {
-	a := &Arbitrage{
-		config: &config.Config{
-			WETHAddress: common.HexToAddress("0x4200000000000000000000000000000000000006"),
-		},
-	}
+	wethAddress := common.HexToAddress("0x4200000000000000000000000000000000000006")
 	pairs := []string{
 		"--------pair 0x41d160033C222E6f3722EC97379867324567d883 0x4200000000000000000000000000000000000006 0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA 291259013940960551613 463302110785 25",
 		"--------pair 0x282f9231E5294E7354744df36461c21e0E68061C 0xB79DD08EA68A908A97220C76d19A6aA9cBDE4376 0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA 382185083241 381491812370 31",
@@ -263,5 +257,5 @@ func TestAmountsOunt(t *testing.T) {
 		pair.Fee, _ = strconv.ParseInt(w[6], 10, 64)
 		pairPath = append(pairPath, pair)
 	}
-	t.Log(a.getAmountsOut(float64(44635314010151), pairPath))
+	t.Log(protocol.GetAmountsOut(wethAddress, float64(44635314010151), pairPath))
 }

@@ -131,7 +131,7 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 	var (
 		amtIn, amtOut float64
 		canTrade      bool
-		minRecieve    = a.getMinRecieve()
+		minRecieve    = a.trader.EstimateFee(len(pairPath)) * 1.5
 	)
 	pair0 := pairs[path[len(path)-1]].(*protocol.UniswapV2Pair)
 	if pair0 == nil {
@@ -147,13 +147,13 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 		return
 	}
 	for {
-		pAmtOut := a.getAmountsOut(amtIn, pairPath)
+		pAmtOut := protocol.GetAmountsOut(a.config.WETHAddress, amtIn, pairPath)
 		if pAmtOut <= amtIn+minRecieve {
 			if amtIn < minRecieve {
 				// utils.Warnf("------ %f %f %f %f %+v", amtIn, pAmtIn, (pAmtIn-amtIn)/math.Pow10(18), minRecieve/math.Pow10(18), path)
 				return
 			}
-			amtIn *= 0.8
+			amtIn *= 0.9
 		} else {
 			canTrade = true
 			amtOut = pAmtOut
@@ -166,52 +166,9 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 			pair := pairs[path[i]].(*protocol.UniswapV2Pair)
 			utils.Warnf("--------pair %s %s %s %s %s %d", pair.Address, pair.Token0, pair.Token1, pair.Reserve0, pair.Reserve1, pair.Fee)
 		}
-		err := a.trader.SwapV2(ctx, amtIn, amtOut, pairPath)
+		err := a.trader.SwapV2(ctx, amtIn, pairPath)
 		if err != nil {
 			utils.Errorf("SwapV2 fail %s", err)
 		}
 	}
-}
-
-func (a *Arbitrage) getAmountsOut(amountIn float64, pairPath []*protocol.UniswapV2Pair) float64 {
-	var (
-		pAmtOut  float64 = amountIn
-		tokenOut         = a.config.WETHAddress
-	)
-	for _, pair := range pairPath {
-		r0, _ := pair.Reserve0.Float64()
-		r1, _ := pair.Reserve1.Float64()
-		if pair.Token0 == tokenOut {
-			pAmtOut = a.getAmountOut(pAmtOut, r0, r1, float64(pair.Fee))
-			tokenOut = pair.Token1
-		} else if pair.Token1 == tokenOut {
-			pAmtOut = a.getAmountOut(pAmtOut, r1, r0, float64(pair.Fee))
-			tokenOut = pair.Token0
-		} else {
-			return 0
-		}
-	}
-	if tokenOut != a.config.WETHAddress {
-		return 0
-	}
-	return pAmtOut
-}
-
-func (a *Arbitrage) getAmountOut(amountIn, reserveIn, reserveOut, fee float64) float64 {
-	if amountIn <= 0 || reserveIn <= 0 || reserveOut <= 0 {
-		return 0
-	}
-	amountInWithFee := amountIn * (protocol.FeeBase - fee)
-	numerator := amountInWithFee * reserveOut
-	denominator := reserveIn*protocol.FeeBase + amountInWithFee
-	return numerator / denominator
-}
-
-func (a *Arbitrage) getMinRecieve() float64 {
-	gasPrice := a.trader.GasPrice() / 20
-	eGasPrice := a.trader.ETHGasPrice()
-	// TODO base chain
-	// minRecv := a.config.MinRecieve
-	minRecv := 350000*gasPrice + (eGasPrice * 2000 * 0.684)
-	return minRecv
 }
