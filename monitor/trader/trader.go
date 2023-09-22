@@ -234,7 +234,7 @@ func (t *Trader) EstimateFee(length int) float64 {
 	eGasPrice := t.ETHGasPrice()
 	gas := float64(80000 + length*70000)
 	eGas := float64(2000 + length*200)
-	fee := gas*gasPrice + (eGasPrice * eGas * 0.684)
+	fee := gas*gasPrice + (eGasPrice * eGas)
 	return fee
 }
 
