@@ -166,15 +166,15 @@ type Route struct {
 }
 
 func (t *Trader) SwapV2(ctx context.Context, inputAmount float64, pairPath []*protocol.UniswapV2Pair) error {
-	gasPrice := int64(t.GetPreferGasPrice())
-	if gasPrice <= 0 {
-		return fmt.Errorf("gas price error %d", gasPrice)
+	minGasPrice := int64(t.MinGasPrice())
+	if minGasPrice <= 0 {
+		return fmt.Errorf("gas price error %d", minGasPrice)
 	}
 	call := ethereum.CallMsg{
 		From:     t.config.FromAddress,
 		To:       &t.config.SwapAddress,
 		Gas:      uint64(70000 + len(pairPath)*100000),
-		GasPrice: big.NewInt(gasPrice),
+		GasPrice: big.NewInt(minGasPrice),
 	}
 	var (
 		inAddr          = t.config.WETHAddress
@@ -215,35 +215,51 @@ func (t *Trader) SwapV2(ctx context.Context, inputAmount float64, pairPath []*pr
 		return fmt.Errorf("sign tx fail %s", err)
 	}
 	// final check
-	amountOut := protocol.GetAmountsOut(t.config.WETHAddress, inputAmount, pairPath)
-	estimateFee := t.EstimateFeeByGas(len(pairPath), gasUsed)
-	// if amountOut-inputAmount < estimateFee*2 {
-	// 	return fmt.Errorf("final check fail amountIn %f amountOut %f estimateFee %f gasUsed %d gasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), estimateFee/math.Pow10(18), gasUsed, float64(gasPrice)/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
-	// }
-	if amountOut-inputAmount < estimateFee*1.2 {
-		return fmt.Errorf("final check fail amountIn %f amountOut %f estimateFee %f gasUsed %d gasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), estimateFee/math.Pow10(18), gasUsed, float64(gasPrice)/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
+	gasPrice, err := t.finalCheck(gasUsed, inputAmount, pairPath)
+	if err != nil {
+		return err
 	}
-	utils.Warnf("final check pass amountIn %f amountOut %f estimateFee %f gasUsed %d gasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), estimateFee/math.Pow10(18), gasUsed, float64(gasPrice)/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
+	call.GasPrice = big.NewInt(gasPrice)
 	// return nil
 	return cli.SendTransaction(ctx, tx)
 }
 
+func (t *Trader) finalCheck(gasUsed uint64, inputAmount float64, pairPath []*protocol.UniswapV2Pair) (int64, error) {
+	// TODO base chain
+	amountOut := protocol.GetAmountsOut(t.config.WETHAddress, inputAmount, pairPath)
+	fee := (amountOut - inputAmount) / 1.2
+	maxGasPrice := t.gasPriceFromFee(len(pairPath), gasUsed, fee)
+	minGasPrice := t.MinGasPrice()
+	gasPrice := t.GasPrice()
+	if maxGasPrice < minGasPrice {
+		return 0, fmt.Errorf("final check fail amountIn %f amountOut %f gasUsed %d maxGasPrice %f gwei minGasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), gasUsed, maxGasPrice/math.Pow10(9), minGasPrice/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
+	}
+	if maxGasPrice < gasPrice {
+		gasPrice = minGasPrice
+	} else if fee > 0.001 {
+		return 0, fmt.Errorf("final check danger amountIn %f amountOut %f gasUsed %d maxGasPrice %f gwei minGasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), gasUsed, maxGasPrice/math.Pow10(9), minGasPrice/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
+	} else {
+		gasPrice = maxGasPrice
+	}
+	utils.Warnf("final check pass amountIn %f amountOut %f gasUsed %d passGasPrice %f gwei maxGasPrice %f gwei minGasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), gasUsed, gasPrice/math.Pow10(9), maxGasPrice/math.Pow10(9), minGasPrice/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
+	return int64(gasPrice), nil
+}
+
+func (t *Trader) gasPriceFromFee(length int, gasUsed uint64, fee float64) float64 {
+	// TODO linea chain
+	return fee / float64(gasUsed)
+}
+
 func (t *Trader) EstimateFee(length int) float64 {
-	// linea chain
-	gasPrice := t.GetPreferGasPrice()
+	// TODO linea chain
+	gasPrice := t.MinGasPrice()
 	gas := swapGas(length)
 	fee := gas * gasPrice
 	return fee
 }
 
-func (t *Trader) EstimateFeeByGas(length int, gas uint64) float64 {
-	// linea chain
-	gasPrice := t.GetPreferGasPrice()
-	fee := float64(gas) * gasPrice
-	return fee
-}
-
-func (t *Trader) GetPreferGasPrice() float64 {
+func (t *Trader) MinGasPrice() float64 {
+	// TODO linea chain
 	return t.GasPrice() * 0.8
 }
 
@@ -262,6 +278,7 @@ func swapGas(length int) float64 {
 	}
 }
 
+// TODO base chain
 func swapBaseEthGas(length int) float64 {
 	switch length {
 	case 2:
