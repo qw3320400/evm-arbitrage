@@ -260,7 +260,7 @@ func (t *Trader) EstimateFee(length int) float64 {
 
 func (t *Trader) MinGasPrice() float64 {
 	// TODO linea chain
-	return t.GasPrice() * 0.8
+	return t.GasPrice() * 0.95
 }
 
 func swapGas(length int) float64 {
