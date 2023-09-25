@@ -93,7 +93,6 @@ func (a *Arbitrage) findArbitrage(ctx context.Context) error {
 	path := g.FindCircle(a.config.WETHAddress)
 	if len(path) > 0 {
 		go a.tryTrade(ctx, path, pairs)
-		go a.failPair(ctx, path)
 	}
 	// utils.Infof("find arbitrage finish in %s", time.Since(startTime))
 	return nil
@@ -200,6 +199,7 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 			failCount++
 			duplicate.Set(key, failCount, time.Minute*time.Duration(10*failCount))
 			utils.Errorf("SwapV2 fail %s", err)
+			go a.failPair(ctx, path)
 		}
 	}
 }
