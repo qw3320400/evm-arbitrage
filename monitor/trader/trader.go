@@ -236,7 +236,7 @@ func (t *Trader) finalCheck(gasUsed uint64, inputAmount float64, pairPath []*pro
 	}
 	if maxGasPrice < gasPrice {
 		gasPrice = minGasPrice
-	} else if fee > 0.001 {
+	} else if fee > 0.001*math.Pow10(18) {
 		return 0, fmt.Errorf("final check danger amountIn %f amountOut %f gasUsed %d maxGasPrice %f gwei minGasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), gasUsed, maxGasPrice/math.Pow10(9), minGasPrice/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
 	} else {
 		gasPrice = maxGasPrice
