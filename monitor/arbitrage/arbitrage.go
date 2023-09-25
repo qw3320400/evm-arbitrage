@@ -199,7 +199,6 @@ func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs m
 			failCount++
 			duplicate.Set(key, failCount, time.Minute*time.Duration(10*failCount))
 			utils.Errorf("SwapV2 fail %s", err)
-			go a.failPair(ctx, path)
 		}
 	}
 }
