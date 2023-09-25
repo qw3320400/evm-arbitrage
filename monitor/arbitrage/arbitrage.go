@@ -18,6 +18,7 @@ import (
 var (
 	_         utils.Keeper = &Arbitrage{}
 	duplicate              = cache.New(time.Minute, 12*time.Hour)
+	failPair               = cache.New(time.Second*30, time.Minute*10)
 )
 
 type Arbitrage struct {
@@ -92,6 +93,7 @@ func (a *Arbitrage) findArbitrage(ctx context.Context) error {
 	path := g.FindCircle(a.config.WETHAddress)
 	if len(path) > 0 {
 		go a.tryTrade(ctx, path, pairs)
+		go a.failPair(ctx, path)
 	}
 	// utils.Infof("find arbitrage finish in %s", time.Since(startTime))
 	return nil
@@ -108,6 +110,28 @@ func (l AddressList) String() string {
 		ret += string(addr.Bytes())
 	}
 	return ret
+}
+
+func (a *Arbitrage) failPair(ctx context.Context, path []common.Address) {
+	var (
+		maxPair  common.Address
+		maxCount int64
+	)
+	for _, pair := range path {
+		pairStr := pair.String()
+		var count int64 = 1
+		if c, ok := failPair.Get(pairStr); ok {
+			count = c.(int64) + 1
+		}
+		failPair.SetDefault(pairStr, count)
+		if count > 10000 && count > maxCount {
+			maxCount = count
+			maxPair = pair
+		}
+	}
+	if maxCount > 0 {
+		utils.Errorf("found potential fail pair %d %s", maxCount, maxPair)
+	}
 }
 
 func (a *Arbitrage) tryTrade(ctx context.Context, path []common.Address, pairs map[interface{}]interface{}) {
