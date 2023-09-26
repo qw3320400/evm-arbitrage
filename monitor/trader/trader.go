@@ -209,17 +209,18 @@ func (t *Trader) SwapV2(ctx context.Context, inputAmount float64, pairPath []*pr
 	if err != nil {
 		return fmt.Errorf("get nonce fail %s", err)
 	}
-	tx := types.NewTransaction(nonce, *call.To, big.NewInt(0), uint64(float64(gasUsed)*1.1), call.GasPrice, call.Data)
-	tx, err = types.SignTx(tx, t.signer, t.privateKey)
-	if err != nil {
-		return fmt.Errorf("sign tx fail %s", err)
-	}
 	// final check
 	gasPrice, err := t.finalCheck(gasUsed, inputAmount, pairPath)
 	if err != nil {
 		return err
 	}
 	call.GasPrice = big.NewInt(gasPrice)
+	// sign
+	tx := types.NewTransaction(nonce, *call.To, big.NewInt(0), uint64(float64(gasUsed)*1.1), call.GasPrice, call.Data)
+	tx, err = types.SignTx(tx, t.signer, t.privateKey)
+	if err != nil {
+		return fmt.Errorf("sign tx fail %s", err)
+	}
 	// return nil
 	return cli.SendTransaction(ctx, tx)
 }
