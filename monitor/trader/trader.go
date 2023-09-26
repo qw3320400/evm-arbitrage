@@ -209,17 +209,18 @@ func (t *Trader) SwapV2(ctx context.Context, inputAmount float64, pairPath []*pr
 	if err != nil {
 		return fmt.Errorf("get nonce fail %s", err)
 	}
-	tx := types.NewTransaction(nonce, *call.To, big.NewInt(0), uint64(float64(gasUsed)*1.1), call.GasPrice, call.Data)
-	tx, err = types.SignTx(tx, t.signer, t.privateKey)
-	if err != nil {
-		return fmt.Errorf("sign tx fail %s", err)
-	}
 	// final check
 	gasPrice, err := t.finalCheck(gasUsed, inputAmount, pairPath)
 	if err != nil {
 		return err
 	}
 	call.GasPrice = big.NewInt(gasPrice)
+	// sign
+	tx := types.NewTransaction(nonce, *call.To, big.NewInt(0), uint64(float64(gasUsed)*1.1), call.GasPrice, call.Data)
+	tx, err = types.SignTx(tx, t.signer, t.privateKey)
+	if err != nil {
+		return fmt.Errorf("sign tx fail %s", err)
+	}
 	// return nil
 	return cli.SendTransaction(ctx, tx)
 }
@@ -239,7 +240,7 @@ func (t *Trader) finalCheck(gasUsed uint64, inputAmount float64, pairPath []*pro
 	} else if fee > 0.001*math.Pow10(18) {
 		return 0, fmt.Errorf("final check danger amountIn %f amountOut %f gasUsed %d maxGasPrice %f gwei minGasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), gasUsed, maxGasPrice/math.Pow10(9), minGasPrice/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
 	} else {
-		gasPrice = maxGasPrice
+		return 0, fmt.Errorf("final check danger amountIn %f amountOut %f gasUsed %d maxGasPrice %f gwei minGasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), gasUsed, maxGasPrice/math.Pow10(9), minGasPrice/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
 	}
 	utils.Warnf("final check pass amountIn %f amountOut %f gasUsed %d passGasPrice %f gwei maxGasPrice %f gwei minGasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), gasUsed, gasPrice/math.Pow10(9), maxGasPrice/math.Pow10(9), minGasPrice/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
 	return int64(gasPrice), nil
