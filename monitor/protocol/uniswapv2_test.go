@@ -12,7 +12,7 @@ import (
 
 func TestPairInfo(t *testing.T) {
 	ctx := context.Background()
-	addr := "0x41d160033c222e6f3722ec97379867324567d883"
+	addr := "0xcdd41009e74bd1ae4f7b2eecf892e4bc718b9302"
 	pair := &UniswapV2Pair{
 		Address: common.HexToAddress(addr),
 	}
@@ -20,7 +20,7 @@ func TestPairInfo(t *testing.T) {
 	viewcalls = append(viewcalls, NewUniswapV2PairInfoCalls(pair)...)
 	viewcalls = append(viewcalls, NewUniswapV2PairStateCalls(pair)...)
 	cli, err := client.GetETHClient(ctx,
-		"wss://distinguished-long-frog.base-mainnet.discover.quiknode.pro/9733b4ce6e9bbd6556771ea11f7a910d7ba0c50a/",
+		"https://optimism-mainnet.infura.io/v3/b13093bf13104631811fcef50795a4a9",
 		common.HexToAddress("0xcA11bde05977b3631167028862bE2a173976CA11"))
 	if err != nil {
 		t.Fatal(err)

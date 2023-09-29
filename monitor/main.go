@@ -34,7 +34,7 @@ func main() {
 	ctx := context.Background()
 	conf := &config.Config{
 		Node:             "https://optimism-mainnet.infura.io/v3/b13093bf13104631811fcef50795a4a9",
-		MulticallAddress: common.HexToAddress("0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696"),
+		MulticallAddress: common.HexToAddress("0xcA11bde05977b3631167028862bE2a173976CA11"),
 		WETHAddress:      common.HexToAddress("0x4200000000000000000000000000000000000006"),
 		// Node:             "wss://dimensional-late-hill.discover.quiknode.pro/3a713b1cdb406ca2608e2a1b987eee47aedfcdaf/",
 		// MulticallAddress: "0x9695fa23b27022c7dd752b7d64bb5900677ecc21",
