@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	ethabi "github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 )
@@ -23,15 +25,50 @@ const (
 )
 
 var (
-	UniswapV2PairEventSwapSign = abi.UniswapV2PairABIInstance.Events["Swap"].ID
-	UniswapV2PairEventSyncSign = abi.UniswapV2PairABIInstance.Events["Sync"].ID
+	UniswapV2PairEventSwapSign        = abi.UniswapV2PairABIInstance.Events["Swap"].ID
+	UniswapV2PairEventSyncSign        = abi.UniswapV2PairABIInstance.Events["Sync"].ID
+	UniswapV2PairEventSyncUint256Sign common.Hash
 
 	_ storage.DataUpdate = &UniswapV2Pair{}
 	_ DataConvert        = &UniswapV2Pair{}
 
 	// swapEvent = cache.New(time.Minute, time.Hour)
 	// syncEvent = cache.New(time.Minute, time.Hour)
+
+	syncEventUint256 = `
+[
+    {
+		"anonymous": false,
+		"inputs": [{
+			"indexed": false,
+			"internalType": "uint256",
+			"name": "reserve0",
+			"type": "uint256"
+		}, {
+			"indexed": false,
+			"internalType": "uint256",
+			"name": "reserve1",
+			"type": "uint256"
+		}],
+		"name": "Sync",
+		"type": "event"
+	}
+]
+	`
+	syncEventUint256ABI *ethabi.ABI
 )
+
+func init() {
+	md := &bind.MetaData{
+		ABI: syncEventUint256,
+	}
+	var err error
+	syncEventUint256ABI, err = md.GetAbi()
+	if err != nil {
+		panic(err)
+	}
+	UniswapV2PairEventSyncUint256Sign = syncEventUint256ABI.Events["Sync"].ID
+}
 
 /*
 ai/ao = (ri+ai)/ro
@@ -136,8 +173,7 @@ func FilterUniswapV2PairFromLog(ctx context.Context, logs []*types.Log) (map[com
 	datas := map[common.Address]*UniswapV2Pair{}
 	for _, log := range logs {
 		// utils.Infof("filter uniswapv2 log in blocknumber %d txindex %d logindex %d", log.BlockNumber, log.TxIndex, log.Index)
-		if len(log.Topics) != 1 ||
-			!strings.EqualFold(log.Topics[0].String(), UniswapV2PairEventSyncSign.String()) {
+		if len(log.Topics) != 1 || !isSyncTopic(log.Topics[0]) {
 			continue
 		}
 		dataList, err := abi.UniswapV2PairABIInstance.Events["Sync"].Inputs.Unpack(log.Data)
@@ -203,8 +239,7 @@ func FilterUniswapV2FeeFromLog(ctx context.Context, logs []*types.Log) (map[comm
 		fees[event.Address] = CalculatePairFee(event.Amount0In, event.Amount1In, event.Amount0Out, event.Amount1Out, syncEvent.Reserve0, syncEvent.Reserve1)
 	}
 	for _, log := range logs {
-		if len(log.Topics) != 1 ||
-			!strings.EqualFold(log.Topics[0].String(), UniswapV2PairEventSyncSign.String()) {
+		if len(log.Topics) != 1 || !isSyncTopic(log.Topics[0]) {
 			continue
 		}
 		dataList, err := abi.UniswapV2PairABIInstance.Events["Sync"].Inputs.Unpack(log.Data)
@@ -373,4 +408,12 @@ func GetAmountOut(amountIn, reserveIn, reserveOut, fee float64) float64 {
 	numerator := amountInWithFee * reserveOut
 	denominator := reserveIn*FeeBase + amountInWithFee
 	return numerator / denominator
+}
+
+func isSyncTopic(topic common.Hash) bool {
+	if strings.EqualFold(topic.String(), UniswapV2PairEventSyncSign.String()) ||
+		strings.EqualFold(topic.String(), UniswapV2PairEventSyncUint256Sign.String()) {
+		return true
+	}
+	return false
 }
