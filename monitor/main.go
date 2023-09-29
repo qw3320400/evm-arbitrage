@@ -33,16 +33,16 @@ func main() {
 
 	ctx := context.Background()
 	conf := &config.Config{
-		Node:             "wss://distinguished-long-frog.base-mainnet.discover.quiknode.pro/9733b4ce6e9bbd6556771ea11f7a910d7ba0c50a/",
-		MulticallAddress: common.HexToAddress("0xcA11bde05977b3631167028862bE2a173976CA11"),
+		Node:             "https://optimism-mainnet.infura.io/v3/b13093bf13104631811fcef50795a4a9",
+		MulticallAddress: common.HexToAddress("0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696"),
 		WETHAddress:      common.HexToAddress("0x4200000000000000000000000000000000000006"),
 		// Node:             "wss://dimensional-late-hill.discover.quiknode.pro/3a713b1cdb406ca2608e2a1b987eee47aedfcdaf/",
 		// MulticallAddress: "0x9695fa23b27022c7dd752b7d64bb5900677ecc21",
 		// WETHAddress:      common.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"),
-		StoreFilePath: "./data",
+		StoreFilePath: "./data_optimism",
 		FromAddress:   common.HexToAddress(os.Getenv("ADDRESS")),
 		PrivateKey:    os.Getenv("PRIVATEKEY"),
-		SwapAddress:   common.HexToAddress("0x229735D12D750B09b751fbD6b75B55902c1A2c0a"),
+		SwapAddress:   common.HexToAddress("0x8FE3eA3B157B88C4D4a50C8cD773B9fAE6d35978"),
 		MinRecieve:    0.0001,
 		ETHNode:       "https://eth.llamarpc.com",
 	}
