@@ -49,7 +49,7 @@ func (e *EVMMonitor) Init(ctx context.Context) error {
 	go func() {
 		for {
 			<-time.After(time.Second)
-			err := e.subscribeFilter(ctx)
+			err := e.loopLogs(ctx)
 			if err != nil {
 				utils.Warnf("subscribe filter fail %s", err)
 			}
