@@ -77,3 +77,7 @@ func TestFileData(t *testing.T) {
 		t.Fatalf("%+v %+v", new, old)
 	}
 }
+
+func TestSyncUint256(t *testing.T) {
+	t.Logf("- %s", UniswapV2PairEventSyncUint256Sign)
+}

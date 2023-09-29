@@ -14,6 +14,7 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -81,6 +82,89 @@ func (e *EVMMonitor) loopWatcher(ctx context.Context) {
 	}
 }
 
+func (e *EVMMonitor) loopFilter(ctx context.Context) error {
+	cli, err := client.GetETHClient(ctx, e.config.Node, e.config.MulticallAddress)
+	if err != nil {
+		return fmt.Errorf("get eth client fail %s", err)
+	}
+	blockNumber, err := cli.BlockNumber(ctx)
+	if err != nil {
+		return fmt.Errorf("get block number fail %s", err)
+	}
+	filter := ethereum.FilterQuery{
+		FromBlock: big.NewInt(int64(blockNumber)),
+		Topics: [][]common.Hash{
+			{
+				protocol.UniswapV2PairEventSyncSign,
+				protocol.UniswapV2PairEventSwapSign,
+				protocol.UniswapV2PairEventSyncUint256Sign,
+			},
+		},
+	}
+	var filterID hexutil.Uint64
+	err = cli.Client.Client().CallContext(ctx, &filterID, "eth_newFilter", filter)
+	if err != nil {
+		return fmt.Errorf("new filter fail %s", err)
+	}
+	for {
+		<-time.After(time.Second)
+		var logs []*types.Log
+		err = cli.Client.Client().CallContext(ctx, &logs, "eth_getFilterLogs", filterID)
+		if err != nil {
+			return fmt.Errorf("get filter logs fail %s", err)
+		}
+		go e.onNewLogs(ctx, logs)
+	}
+}
+
+func (e *EVMMonitor) loopLogs(ctx context.Context) error {
+	cli, err := client.GetETHClient(ctx, e.config.Node, e.config.MulticallAddress)
+	if err != nil {
+		return fmt.Errorf("get eth client fail %s", err)
+	}
+	var (
+		lastBlockNumber uint64
+		filter          = ethereum.FilterQuery{
+			Topics: [][]common.Hash{
+				{
+					protocol.UniswapV2PairEventSyncSign,
+					protocol.UniswapV2PairEventSwapSign,
+					protocol.UniswapV2PairEventSyncUint256Sign,
+				},
+			},
+		}
+	)
+	for {
+		<-time.After(time.Second)
+
+		blockNumber, err := cli.BlockNumber(ctx)
+		if err != nil {
+			return fmt.Errorf("get block number fail %s", err)
+		}
+		if blockNumber <= lastBlockNumber {
+			continue
+		}
+		if lastBlockNumber > 0 {
+			filter.FromBlock = big.NewInt(int64(lastBlockNumber + 1))
+		} else {
+			filter.FromBlock = big.NewInt(int64(blockNumber))
+		}
+		lastBlockNumber = blockNumber
+		logs, err := cli.FilterLogs(ctx, filter)
+		if err != nil {
+			return fmt.Errorf("get filter logs fail %s", err)
+		}
+		if len(logs) <= 0 {
+			continue
+		}
+		tmp := make([]*types.Log, 0, len(logs))
+		for _, log := range logs {
+			tmp = append(tmp, &log)
+		}
+		go e.onNewLogs(ctx, tmp)
+	}
+}
+
 func (e *EVMMonitor) subscribeWatcher(ctx context.Context) error {
 	cli, err := client.GetETHClient(ctx, e.config.Node, e.config.MulticallAddress)
 	if err != nil {
@@ -120,6 +204,7 @@ func (e *EVMMonitor) subscribeFilter(ctx context.Context) error {
 			{
 				protocol.UniswapV2PairEventSyncSign,
 				protocol.UniswapV2PairEventSwapSign,
+				protocol.UniswapV2PairEventSyncUint256Sign,
 			},
 		},
 	}
