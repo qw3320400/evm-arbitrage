@@ -97,7 +97,7 @@ func (e *EVMMonitor) loopFilter(ctx context.Context) error {
 			{
 				protocol.UniswapV2PairEventSyncSign,
 				protocol.UniswapV2PairEventSwapSign,
-				protocol.UniswapV2PairEventSyncUint256Sign,
+				// protocol.UniswapV2PairEventSyncUint256Sign,
 			},
 		},
 	}
@@ -129,7 +129,7 @@ func (e *EVMMonitor) loopLogs(ctx context.Context) error {
 				{
 					protocol.UniswapV2PairEventSyncSign,
 					protocol.UniswapV2PairEventSwapSign,
-					protocol.UniswapV2PairEventSyncUint256Sign,
+					// protocol.UniswapV2PairEventSyncUint256Sign,
 				},
 			},
 		}
@@ -204,7 +204,7 @@ func (e *EVMMonitor) subscribeFilter(ctx context.Context) error {
 			{
 				protocol.UniswapV2PairEventSyncSign,
 				protocol.UniswapV2PairEventSwapSign,
-				protocol.UniswapV2PairEventSyncUint256Sign,
+				// protocol.UniswapV2PairEventSyncUint256Sign,
 			},
 		},
 	}
