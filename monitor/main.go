@@ -33,7 +33,7 @@ func main() {
 
 	ctx := context.Background()
 	conf := &config.Config{
-		Node:             "wss://linea-mainnet.infura.io/ws/v3/b13093bf13104631811fcef50795a4a9",
+		Node:             "wss://linea-mainnet.infura.io/ws/v3/f8cb0deeadc441488416b6c0d99c0413",
 		MulticallAddress: common.HexToAddress("0xcA11bde05977b3631167028862bE2a173976CA11"),
 		WETHAddress:      common.HexToAddress("0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f"),
 		// Node:             "wss://dimensional-late-hill.discover.quiknode.pro/3a713b1cdb406ca2608e2a1b987eee47aedfcdaf/",
