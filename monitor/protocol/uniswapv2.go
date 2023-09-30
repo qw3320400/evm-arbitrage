@@ -411,9 +411,10 @@ func GetAmountOut(amountIn, reserveIn, reserveOut, fee float64) float64 {
 }
 
 func isSyncTopic(topic common.Hash) bool {
-	if strings.EqualFold(topic.String(), UniswapV2PairEventSyncSign.String()) ||
-		strings.EqualFold(topic.String(), UniswapV2PairEventSyncUint256Sign.String()) {
-		return true
-	}
-	return false
+	// if strings.EqualFold(topic.String(), UniswapV2PairEventSyncSign.String()) ||
+	// 	strings.EqualFold(topic.String(), UniswapV2PairEventSyncUint256Sign.String()) {
+	// 	return true
+	// }
+	// return false
+	return strings.EqualFold(topic.String(), UniswapV2PairEventSyncSign.String())
 }
