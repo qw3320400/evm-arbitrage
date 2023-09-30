@@ -237,10 +237,10 @@ func (t *Trader) finalCheck(gasUsed uint64, inputAmount float64, pairPath []*pro
 	}
 	if maxGasPrice < gasPrice {
 		gasPrice = minGasPrice
-	} else if fee > 0.001*math.Pow10(18) {
-		return 0, fmt.Errorf("final check danger amountIn %f amountOut %f gasUsed %d maxGasPrice %f gwei minGasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), gasUsed, maxGasPrice/math.Pow10(9), minGasPrice/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
-	} else {
-		return 0, fmt.Errorf("final check danger amountIn %f amountOut %f gasUsed %d maxGasPrice %f gwei minGasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), gasUsed, maxGasPrice/math.Pow10(9), minGasPrice/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
+		// } else if fee > 0.001*math.Pow10(18) {
+		// 	return 0, fmt.Errorf("final check danger amountIn %f amountOut %f gasUsed %d maxGasPrice %f gwei minGasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), gasUsed, maxGasPrice/math.Pow10(9), minGasPrice/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
+		// } else {
+		// 	return 0, fmt.Errorf("final check danger amountIn %f amountOut %f gasUsed %d maxGasPrice %f gwei minGasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), gasUsed, maxGasPrice/math.Pow10(9), minGasPrice/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
 	}
 	utils.Warnf("final check pass amountIn %f amountOut %f gasUsed %d passGasPrice %f gwei maxGasPrice %f gwei minGasPrice %f gwei eth gasPrice %f gwei", inputAmount/math.Pow10(18), amountOut/math.Pow10(18), gasUsed, gasPrice/math.Pow10(9), maxGasPrice/math.Pow10(9), minGasPrice/math.Pow10(9), t.ETHGasPrice()/math.Pow10(9))
 	return int64(gasPrice), nil
@@ -265,7 +265,7 @@ func (t *Trader) EstimateFee(length int) float64 {
 
 func (t *Trader) MinGasPrice() float64 {
 	// TODO base chain
-	return t.GasPrice() / 20
+	return t.GasPrice() / 3
 }
 
 func swapGas(length int) float64 {
